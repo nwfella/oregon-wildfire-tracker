@@ -148,11 +148,6 @@
   .dp-zoom{margin-top:9px; width:100%; padding:7px; border-radius:8px; border:1px solid var(--accent);
     background:rgba(255,107,26,.12); color:var(--accent2); font-weight:700; cursor:pointer; font-size:12px;}
   .dp-zoom:hover{background:rgba(255,107,26,.25);}
-  .dp-em{margin-top:10px; padding-top:9px; border-top:1px dashed var(--border);}
-  .dp-em-title{font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:var(--red); margin-bottom:5px;}
-  .dp-em-line{font-size:11.5px; margin:3px 0; color:var(--text);}
-  .dp-em-line a{color:var(--accent2); text-decoration:none;}
-  .dp-em-line a:hover{text-decoration:underline;}
   .f-detail{
     grid-column:1 / -1; border:1px solid var(--accent); border-radius:12px;
     background:var(--surface2); margin:0 0 10px; max-height:44vh; overflow:auto;
@@ -383,7 +378,7 @@ var drag = null, pinch = null;
 var dirty = true;
 
 /* ---------- build lookup ---------- */
-var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [], EM = {};
+var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [];
 if(D){
   INC = D.incidents || [];
   INC.forEach(function(inc){ INC_BY_NAME[(inc.n||'').toLowerCase()] = inc; });
@@ -391,7 +386,6 @@ if(D){
   PERIM = D.perimeters || [];
   CNTY = D.counties || [];
   CITIES = D.cities || [];
-  (D.emergency || []).forEach(function(e){ EM[e.county] = e; });
 }
 var maxAcres = 1;
 INC.forEach(function(i){ if(i.acres > maxAcres) maxAcres = i.acres; });
@@ -822,19 +816,6 @@ function handleClick(sx, sy){
 }
 
 /* ---------- selection & detail ---------- */
-function emergencyBlock(inc){
-  var em = EM[inc.cnty] || null;
-  var h = '<div class="dp-em"><div class="dp-em-title">🚨 Emergency contacts</div>' +
-    '<div class="dp-em-line"><b>In an emergency: call 911</b></div>';
-  if(em){
-    h += '<div class="dp-em-line">📞 <b>' + esc(inc.cnty) + ' County</b> Emergency Management' +
-      (em.phone ? ' · ' + esc(em.phone) : '') + '</div>' +
-      '<div class="dp-em-line"><a href="' + esc(em.url) + '" target="_blank" rel="noopener">' + esc(inc.cnty) + ' County EM website ↗</a></div>';
-  }
-  h += '<div class="dp-em-line"><a href="https://www.oregon.gov/oem/" target="_blank" rel="noopener">Oregon Office of Emergency Management ↗</a></div>' +
-    '<div class="dp-em-line" style="color:var(--dim);font-size:10.5px;">Evacuation orders &amp; warnings for your area show in the ALERTS tab.</div></div>';
-  return h;
-}
 function incDetailHTML(inc){
   var p = PERIM.filter(function(x){ return x.n === inc.n; });
   return '<div class="dp-head"><div><div class="dp-name">🔥 ' + esc(inc.n) + '</div>' +
@@ -856,7 +837,6 @@ function incDetailHTML(inc){
     row('Perimeter', p.length ? p.length + ' mapped' : 'not mapped') +
     '</div>' +
     (inc.cont != null && inc.cont < 50 ? '<div style="margin:6px 0;font-size:11px;color:#ffd24d;">⚠ Actively spreading — not yet contained</div>' : '') +
-    emergencyBlock(inc) +
     '<button class="dp-zoom">⛶ Zoom to fire</button>' +
     '</div>';
 }
