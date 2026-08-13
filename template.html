@@ -148,11 +148,15 @@
   .dp-zoom{margin-top:9px; width:100%; padding:7px; border-radius:8px; border:1px solid var(--accent);
     background:rgba(255,107,26,.12); color:var(--accent2); font-weight:700; cursor:pointer; font-size:12px;}
   .dp-zoom:hover{background:rgba(255,107,26,.25);}
-  #listDetail{
-    border:1px solid var(--accent); border-radius:12px; background:var(--surface2);
-    margin:0 12px 10px; max-height:44vh; overflow:auto; flex:none;
+  .dp-em{margin-top:10px; padding-top:9px; border-top:1px dashed var(--border);}
+  .dp-em-title{font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:var(--red); margin-bottom:5px;}
+  .dp-em-line{font-size:11.5px; margin:3px 0; color:var(--text);}
+  .dp-em-line a{color:var(--accent2); text-decoration:none;}
+  .dp-em-line a:hover{text-decoration:underline;}
+  .f-detail{
+    grid-column:1 / -1; border:1px solid var(--accent); border-radius:12px;
+    background:var(--surface2); margin:0 0 10px; max-height:44vh; overflow:auto;
   }
-  #listDetail.hidden{display:none;}
   #rail{
     display:flex; flex-direction:column; border:1px solid var(--border); border-radius:16px;
     background:var(--surface); overflow:hidden; width:100%; max-width:1400px;
@@ -289,7 +293,6 @@
       <div class="tab" data-tab="alerts">ALERTS<span class="cnt" id="cntAlerts"></span></div>
       <div class="tab" data-tab="smoke">SMOKE</div>
     </div>
-    <div id="listDetail" class="hidden"></div>
     <div id="tab-fires" class="tabpane">
       <input id="fireSearch" type="text" placeholder="🔎  Search fire name or county…">
       <div id="fireList"></div>
@@ -380,7 +383,7 @@ var drag = null, pinch = null;
 var dirty = true;
 
 /* ---------- build lookup ---------- */
-var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [];
+var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [], EM = {};
 if(D){
   INC = D.incidents || [];
   INC.forEach(function(inc){ INC_BY_NAME[(inc.n||'').toLowerCase()] = inc; });
@@ -388,6 +391,7 @@ if(D){
   PERIM = D.perimeters || [];
   CNTY = D.counties || [];
   CITIES = D.cities || [];
+  (D.emergency || []).forEach(function(e){ EM[e.county] = e; });
 }
 var maxAcres = 1;
 INC.forEach(function(i){ if(i.acres > maxAcres) maxAcres = i.acres; });
@@ -818,6 +822,19 @@ function handleClick(sx, sy){
 }
 
 /* ---------- selection & detail ---------- */
+function emergencyBlock(inc){
+  var em = EM[inc.cnty] || null;
+  var h = '<div class="dp-em"><div class="dp-em-title">🚨 Emergency contacts</div>' +
+    '<div class="dp-em-line"><b>In an emergency: call 911</b></div>';
+  if(em){
+    h += '<div class="dp-em-line">📞 <b>' + esc(inc.cnty) + ' County</b> Emergency Management' +
+      (em.phone ? ' · ' + esc(em.phone) : '') + '</div>' +
+      '<div class="dp-em-line"><a href="' + esc(em.url) + '" target="_blank" rel="noopener">' + esc(inc.cnty) + ' County EM website ↗</a></div>';
+  }
+  h += '<div class="dp-em-line"><a href="https://www.oregon.gov/oem/" target="_blank" rel="noopener">Oregon Office of Emergency Management ↗</a></div>' +
+    '<div class="dp-em-line" style="color:var(--dim);font-size:10.5px;">Evacuation orders &amp; warnings for your area show in the ALERTS tab.</div></div>';
+  return h;
+}
 function incDetailHTML(inc){
   var p = PERIM.filter(function(x){ return x.n === inc.n; });
   return '<div class="dp-head"><div><div class="dp-name">🔥 ' + esc(inc.n) + '</div>' +
@@ -839,7 +856,8 @@ function incDetailHTML(inc){
     row('Perimeter', p.length ? p.length + ' mapped' : 'not mapped') +
     '</div>' +
     (inc.cont != null && inc.cont < 50 ? '<div style="margin:6px 0;font-size:11px;color:#ffd24d;">⚠ Actively spreading — not yet contained</div>' : '') +
-    '<button class="dp-zoom" id="dpZoom">⛶ Zoom to fire</button>' +
+    emergencyBlock(inc) +
+    '<button class="dp-zoom">⛶ Zoom to fire</button>' +
     '</div>';
 }
 function aqiDetailHTML(a){
@@ -854,8 +872,8 @@ function aqiDetailHTML(a){
     '<div class="dp-item"><div class="k">Reading</div><div class="v">' + timeAgo(a.t) + '</div></div>' +
     '</div></div>';
 }
-function wireZoom(inc){
-  var zb = document.getElementById('dpZoom');
+function attachZoom(root, inc){
+  var zb = root.querySelector('.dp-zoom');
   if(!zb) return;
   zb.onclick = function(){
     view.s = Math.min(400, Math.max(view.s, Math.min(W, H) * 0.15));
@@ -866,35 +884,18 @@ function wireZoom(inc){
     if(wrap.scrollIntoView) wrap.scrollIntoView({behavior:'smooth', block:'center'});
   };
 }
-function fillListDetail(i, fromList){
-  var el = document.getElementById('listDetail');
-  var inc = INC[i];
-  el.innerHTML = incDetailHTML(inc);
-  el.classList.remove('hidden');
-  wireZoom(inc);
-  if(fromList){
-    var items = document.querySelectorAll('#fireList .f-item');
-    if(items[i] && items[i].scrollIntoView) items[i].scrollIntoView({block:'nearest'});
-  }
-}
-function fillListDetailAqi(j, fromList){
-  var el = document.getElementById('listDetail');
-  var a = AQI[j];
-  el.innerHTML = aqiDetailHTML(a);
-  el.classList.remove('hidden');
-  if(fromList){
-    var items = document.querySelectorAll('#airList .aq-item');
-    if(items[j] && items[j].scrollIntoView) items[j].scrollIntoView({block:'nearest'});
-  }
-}
 function selectIncident(i, fromList){
   selected = { type: 'inc', id: i };
   var panel = document.getElementById('detailPanel');
   panel.innerHTML = incDetailHTML(INC[i]);
   panel.style.display = 'block';
   positionPopup();
-  fillListDetail(i, !!fromList);
-  highlightList(i);
+  attachZoom(panel, INC[i]);
+  buildFires();
+  if(fromList){
+    var items = document.querySelectorAll('#fireList .f-item');
+    if(items[i] && items[i].scrollIntoView) items[i].scrollIntoView({block:'nearest'});
+  }
   dirty = true;
 }
 function selectAqi(j, fromList){
@@ -904,15 +905,19 @@ function selectAqi(j, fromList){
   panel.innerHTML = aqiDetailHTML(a);
   panel.style.display = 'block';
   positionPopup();
-  fillListDetailAqi(j, !!fromList);
+  buildAir();
+  if(fromList){
+    var items = document.querySelectorAll('#airList .aq-item');
+    if(items[j] && items[j].scrollIntoView) items[j].scrollIntoView({block:'nearest'});
+  }
   dirty = true;
 }
 function row(k, v){ return '<div class="dp-item"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>'; }
 function closeDetail(){
   selected = null;
   document.getElementById('detailPanel').style.display = 'none';
-  document.getElementById('listDetail').classList.add('hidden');
-  highlightList(-1);
+  buildFires();
+  buildAir();
   dirty = true;
 }
 window.__orClose = closeDetail;
@@ -1004,17 +1009,23 @@ function buildFires(){
   if(!list.length){ el.innerHTML = '<div class="empty">No fires match.</div>'; return; }
   el.innerHTML = list.map(function(inc, i){
     var idx = INC.indexOf(inc);
+    var isSel = selected && selected.type === 'inc' && selected.id === idx;
     var w = Math.max(0, Math.min(100, (inc.acres / maxAcres) * 100));
     var cc = contColor(inc.cont);
-    return '<div class="f-item' + (selected && selected.type === 'inc' && selected.id === idx ? ' sel' : '') + '" onclick="window.__orPick(' + idx + ')">' +
+    return '<div class="f-item' + (isSel ? ' sel' : '') + '" onclick="window.__orPick(' + idx + ')">' +
       '<div class="f-top"><span class="f-name">' + esc(inc.n) + '</span><span class="f-cnty">' + esc(inc.cnty || '—') + '</span></div>' +
       '<div class="f-mid"><span class="f-acres">' + fmtAcres(inc.acres) + '</span>' +
       '<span class="f-bar"><i style="width:' + w + '%;background:' + cc + '"></i></span>' +
       '<span class="f-cont" style="color:' + cc + '">' + contLabel(inc.cont) + '</span></div>' +
       '<div class="f-meta"><span><span class="dot2" style="background:' + (inc.cont < 50 ? '#ff3b30' : inc.cont < 90 ? '#ffd24d' : '#35e07f') + '"></span>' +
       (inc.cause || 'cause n/a') + '</span><span>discovered ' + timeAgo(inc.disp) + '</span>' +
-      (inc.per != null ? '<span>' + inc.per + ' personnel</span>' : '') + '</div></div>';
+      (inc.per != null ? '<span>' + inc.per + ' personnel</span>' : '') + '</div></div>' +
+      (isSel ? '<div class="f-detail">' + incDetailHTML(inc) + '</div>' : '');
   }).join('');
+  if(selected && selected.type === 'inc'){
+    var fd = el.querySelector('.f-detail');
+    if(fd) attachZoom(fd, INC[selected.id]);
+  }
 }
 window.__orPick = function(i){ selectIncident(i, true); };
 document.getElementById('fireSearch').addEventListener('input', buildFires);
@@ -1037,10 +1048,12 @@ function buildAir(){
   if(!list.length){ el.innerHTML = '<div class="empty">No air quality readings in this snapshot.</div>'; return; }
   el.innerHTML = list.map(function(a, j){
     var idx = AQI.indexOf(a);
-    return '<div class="aq-item" onclick="window.__orPickAqi(' + idx + ')">' +
+    var isSel = selected && selected.type === 'aqi' && selected.id === idx;
+    return '<div class="aq-item' + (isSel ? ' sel' : '') + '" onclick="window.__orPickAqi(' + idx + ')">' +
       '<div class="aq-badge" style="background:' + a.c + '"><span class="aqv">' + a.aqi + '</span><span class="aql">' + esc(a.cat) + '</span></div>' +
       '<div class="aq-info"><div class="c">' + esc(a.c) + '</div><div class="l">' + esc(a.l || '') + '</div><div class="t">updated ' + timeAgo(a.t) + '</div></div>' +
-      '<div class="aq-pm">PM2.5<br><b>' + a.v.toFixed(1) + '</b></div></div>';
+      '<div class="aq-pm">PM2.5<br><b>' + a.v.toFixed(1) + '</b></div></div>' +
+      (isSel ? '<div class="f-detail">' + aqiDetailHTML(a) + '</div>' : '');
   }).join('');
 }
 window.__orPickAqi = function(j){ selectAqi(j, true); };

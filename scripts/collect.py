@@ -409,6 +409,10 @@ def main():
         outline = json.load(f)["rings"]
     print(f"  state outline rings: {len(outline)}")
 
+    with open(os.path.join(ROOT, "assets", "emergency.json"), encoding="utf-8") as f:
+        emergency = json.load(f)
+    print(f"  county EM contacts: {len(emergency)}")
+
     # ---- stats
     total_acres = sum(i["acres"] or 0 for i in incidents)
     conts = [i["cont"] for i in incidents if i["cont"] is not None]
@@ -435,6 +439,7 @@ def main():
         "smoke": smoke,
         "counties": counties,
         "outline": outline,
+        "emergency": emergency,
         "cities": [{"n": n, "lat": la, "lon": lo, "major": m} for n, la, lo, m in CITIES],
     }
 
