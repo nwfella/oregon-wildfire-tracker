@@ -13,6 +13,7 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 - **County burn-heat choropleth** — counties shaded by active fire acreage
 - **Active fires** — 97 incidents live from the NIFC/WFIGS feed: size, containment, cause,
   personnel, structures lost, complexity, discovery & last-report times
+- **Anchored popup details** — tap any fire or AQI monitor and a popup bubble appears right next to it (arrow pointing at the marker, flips below near the top edge, follows the marker while you pan/zoom); full details: acres, containment, cause, personnel, structures lost, dates
 - **Daily perimeters** — orange fire boundaries, pulse-highlighted when a fire is selected
 - **Air quality** — PM2.5 readings from 100+ Oregon monitors (OpenAQ mirror), EPA AQI +
   category colors, worst-first ranking
