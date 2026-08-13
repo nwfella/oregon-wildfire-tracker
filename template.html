@@ -435,7 +435,7 @@ function drawCounties(){
     });
     ctx.fillStyle = col;
     ctx.fill();
-    ctx.strokeStyle = c.b > 0 ? 'rgba(255,170,80,.55)' : '#2a303e';
+    ctx.strokeStyle = c.b > 0 ? 'rgba(255,170,80,.55)' : '#3a4254';
     ctx.lineWidth = 1;
     ctx.stroke();
     // county label when zoomed
@@ -448,6 +448,41 @@ function drawCounties(){
       ctx.fillText(c.n, cx/n, cy/n);
     }
   });
+}
+function drawStateOutline(){
+  var out = D.outline || [];
+  if(!out.length) return;
+  function trace(){
+    ctx.beginPath();
+    out.forEach(function(ring){
+      var first = true;
+      ring.forEach(function(pt){
+        var s = toScreen(pt[0], pt[1]);
+        if(first){ ctx.moveTo(s[0], s[1]); first = false; }
+        else ctx.lineTo(s[0], s[1]);
+      });
+      ctx.closePath();
+    });
+  }
+  trace();
+  // dark casing — separates the state from counties/background
+  ctx.strokeStyle = 'rgba(8,10,15,.9)';
+  ctx.lineWidth = 7;
+  ctx.stroke();
+  // soft ember glow
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,140,60,.5)';
+  ctx.shadowBlur = 12;
+  trace();
+  ctx.strokeStyle = 'rgba(255,140,60,.35)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+  // crisp bright border on top
+  trace();
+  ctx.strokeStyle = 'rgba(228,236,250,.95)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 function drawPerimeters(){
   var now = Date.now();
@@ -632,6 +667,7 @@ function render(){
   drawIncidents();
   drawAQI();
   drawCities();
+  drawStateOutline();
   drawHover();
   drawEmbers();
 }
@@ -1027,6 +1063,7 @@ function buildLegend(){
   var el = document.getElementById('legend');
   el.innerHTML =
     '<div class="lg-title">Legend</div>' +
+    '<div class="lg-row"><span class="sw" style="height:3px; background:#e4ecfa;"></span><span class="lbl">Oregon state boundary</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#ff3b30;"></span><span class="lbl">containment &lt; 25%</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#ff8c1a;"></span><span class="lbl">25 – 50%</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#ffd24d;"></span><span class="lbl">50 – 90%</span></div>' +

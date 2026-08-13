@@ -405,6 +405,10 @@ def main():
     counties = build_counties(incidents)
     print(f"  counties: {len(counties)}")
 
+    with open(os.path.join(ROOT, "assets", "oregon_outline.json"), encoding="utf-8") as f:
+        outline = json.load(f)["rings"]
+    print(f"  state outline rings: {len(outline)}")
+
     # ---- stats
     total_acres = sum(i["acres"] or 0 for i in incidents)
     conts = [i["cont"] for i in incidents if i["cont"] is not None]
@@ -430,6 +434,7 @@ def main():
                     "on": a["on"], "ex": a["ex"], "d": a["d"], "url": a["url"]} for a in alerts],
         "smoke": smoke,
         "counties": counties,
+        "outline": outline,
         "cities": [{"n": n, "lat": la, "lon": lo, "major": m} for n, la, lo, m in CITIES],
     }
 
