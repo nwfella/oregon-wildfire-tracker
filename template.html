@@ -126,28 +126,33 @@
   #detailPanel.below::after{
     top:-9px; bottom:auto; border-top:none; border-bottom:9px solid var(--accent);
   }
-  #detailPanel .dp-head{
+  .dp-head{
     display:flex; align-items:flex-start; gap:10px; padding:10px 14px 8px;
     border-bottom:1px solid var(--border);
   }
-  #detailPanel .dp-name{font-size:15px; font-weight:800; line-height:1.2;}
-  #detailPanel .dp-cnty{font-size:11px; color:var(--muted); margin-top:2px;}
-  #detailPanel .dp-close{
+  .dp-name{font-size:15px; font-weight:800; line-height:1.2;}
+  .dp-cnty{font-size:11px; color:var(--muted); margin-top:2px;}
+  .dp-close{
     margin-left:auto; background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px; border-radius:6px;
   }
-  #detailPanel .dp-close:hover{color:var(--text); background:var(--surface2);}
-  #detailPanel .dp-body{padding:9px 14px 11px;}
-  #detailPanel .dp-big{display:flex; gap:14px; align-items:baseline; margin-bottom:7px;}
-  #detailPanel .dp-acres{font-size:22px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums;}
-  #detailPanel .dp-acres small{font-size:10px; color:var(--muted); font-weight:600; letter-spacing:1px;}
-  #detailPanel .dp-cont{font-size:14px; font-weight:700;}
-  #detailPanel .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:4px 10px;}
-  #detailPanel .dp-item{}
-  #detailPanel .dp-item .k{font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); font-weight:700;}
-  #detailPanel .dp-item .v{font-size:12px; font-weight:600;}
-  #detailPanel .dp-zoom{margin-top:9px; width:100%; padding:7px; border-radius:8px; border:1px solid var(--accent);
+  .dp-close:hover{color:var(--text); background:var(--surface2);}
+  .dp-body{padding:9px 14px 11px;}
+  .dp-big{display:flex; gap:14px; align-items:baseline; margin-bottom:7px;}
+  .dp-acres{font-size:22px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums;}
+  .dp-acres small{font-size:10px; color:var(--muted); font-weight:600; letter-spacing:1px;}
+  .dp-cont{font-size:14px; font-weight:700;}
+  .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:4px 10px;}
+  .dp-item{}
+  .dp-item .k{font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); font-weight:700;}
+  .dp-item .v{font-size:12px; font-weight:600;}
+  .dp-zoom{margin-top:9px; width:100%; padding:7px; border-radius:8px; border:1px solid var(--accent);
     background:rgba(255,107,26,.12); color:var(--accent2); font-weight:700; cursor:pointer; font-size:12px;}
-  #detailPanel .dp-zoom:hover{background:rgba(255,107,26,.25);}
+  .dp-zoom:hover{background:rgba(255,107,26,.25);}
+  #listDetail{
+    border:1px solid var(--accent); border-radius:12px; background:var(--surface2);
+    margin:0 12px 10px; max-height:44vh; overflow:auto; flex:none;
+  }
+  #listDetail.hidden{display:none;}
   #rail{
     display:flex; flex-direction:column; border:1px solid var(--border); border-radius:16px;
     background:var(--surface); overflow:hidden; width:100%; max-width:1400px;
@@ -284,6 +289,7 @@
       <div class="tab" data-tab="alerts">ALERTS<span class="cnt" id="cntAlerts"></span></div>
       <div class="tab" data-tab="smoke">SMOKE</div>
     </div>
+    <div id="listDetail" class="hidden"></div>
     <div id="tab-fires" class="tabpane">
       <input id="fireSearch" type="text" placeholder="🔎  Search fire name or county…">
       <div id="fireList"></div>
@@ -812,37 +818,9 @@ function handleClick(sx, sy){
 }
 
 /* ---------- selection & detail ---------- */
-function selectIncident(i){
-  selected = { type: 'inc', id: i };
-  showDetail(i);
-  highlightList(i);
-  dirty = true;
-}
-function selectAqi(j){
-  selected = { type: 'aqi', id: j };
-  var a = AQI[j];
-  var panel = document.getElementById('detailPanel');
-  panel.innerHTML =
-    '<div class="dp-head"><div><div class="dp-name">🫁 ' + esc(a.c) + '</div>' +
-    '<div class="dp-cnty">' + esc(a.l || '') + '</div></div>' +
-    '<button class="dp-close" onclick="window.__orClose && window.__orClose()">✕</button></div>' +
-    '<div class="dp-body">' +
-    '<div class="dp-big"><span class="dp-acres" style="color:' + a.c + '">' + a.aqi + ' <small>AQI</small></span>' +
-    '<span class="dp-cont">' + esc(a.cat) + '</span></div>' +
-    '<div class="dp-grid">' +
-    '<div class="dp-item"><div class="k">PM2.5</div><div class="v">' + a.v.toFixed(1) + ' µg/m³</div></div>' +
-    '<div class="dp-item"><div class="k">Reading</div><div class="v">' + timeAgo(a.t) + '</div></div>' +
-    '</div></div>';
-  panel.style.display = 'block';
-  positionPopup();
-  dirty = true;
-}
-function showDetail(i){
-  var inc = INC[i];
-  var panel = document.getElementById('detailPanel');
+function incDetailHTML(inc){
   var p = PERIM.filter(function(x){ return x.n === inc.n; });
-  panel.innerHTML =
-    '<div class="dp-head"><div><div class="dp-name">🔥 ' + esc(inc.n) + '</div>' +
+  return '<div class="dp-head"><div><div class="dp-name">🔥 ' + esc(inc.n) + '</div>' +
     '<div class="dp-cnty">' + esc(inc.cnty || '—') + ' County, Oregon</div></div>' +
     '<button class="dp-close" onclick="window.__orClose && window.__orClose()">✕</button></div>' +
     '<div class="dp-body">' +
@@ -863,20 +841,77 @@ function showDetail(i){
     (inc.cont != null && inc.cont < 50 ? '<div style="margin:6px 0;font-size:11px;color:#ffd24d;">⚠ Actively spreading — not yet contained</div>' : '') +
     '<button class="dp-zoom" id="dpZoom">⛶ Zoom to fire</button>' +
     '</div>';
-  panel.style.display = 'block';
-  positionPopup();
-  document.getElementById('dpZoom').onclick = function(){
-    var s = toScreen(inc.lon, inc.lat);
+}
+function aqiDetailHTML(a){
+  return '<div class="dp-head"><div><div class="dp-name">🫁 ' + esc(a.c) + '</div>' +
+    '<div class="dp-cnty">' + esc(a.l || '') + '</div></div>' +
+    '<button class="dp-close" onclick="window.__orClose && window.__orClose()">✕</button></div>' +
+    '<div class="dp-body">' +
+    '<div class="dp-big"><span class="dp-acres" style="color:' + a.c + '">' + a.aqi + ' <small>AQI</small></span>' +
+    '<span class="dp-cont">' + esc(a.cat) + '</span></div>' +
+    '<div class="dp-grid">' +
+    '<div class="dp-item"><div class="k">PM2.5</div><div class="v">' + a.v.toFixed(1) + ' µg/m³</div></div>' +
+    '<div class="dp-item"><div class="k">Reading</div><div class="v">' + timeAgo(a.t) + '</div></div>' +
+    '</div></div>';
+}
+function wireZoom(inc){
+  var zb = document.getElementById('dpZoom');
+  if(!zb) return;
+  zb.onclick = function(){
     view.s = Math.min(400, Math.max(view.s, Math.min(W, H) * 0.15));
     view.cx = inc.lon ? (inc.lon - LON0) * COSL * K : view.cx;
     view.cy = inc.lat ? (LAT1 - inc.lat) * K : view.cy;
     dirty = true;
+    var wrap = document.getElementById('mapWrap');
+    if(wrap.scrollIntoView) wrap.scrollIntoView({behavior:'smooth', block:'center'});
   };
+}
+function fillListDetail(i, fromList){
+  var el = document.getElementById('listDetail');
+  var inc = INC[i];
+  el.innerHTML = incDetailHTML(inc);
+  el.classList.remove('hidden');
+  wireZoom(inc);
+  if(fromList){
+    var items = document.querySelectorAll('#fireList .f-item');
+    if(items[i] && items[i].scrollIntoView) items[i].scrollIntoView({block:'nearest'});
+  }
+}
+function fillListDetailAqi(j, fromList){
+  var el = document.getElementById('listDetail');
+  var a = AQI[j];
+  el.innerHTML = aqiDetailHTML(a);
+  el.classList.remove('hidden');
+  if(fromList){
+    var items = document.querySelectorAll('#airList .aq-item');
+    if(items[j] && items[j].scrollIntoView) items[j].scrollIntoView({block:'nearest'});
+  }
+}
+function selectIncident(i, fromList){
+  selected = { type: 'inc', id: i };
+  var panel = document.getElementById('detailPanel');
+  panel.innerHTML = incDetailHTML(INC[i]);
+  panel.style.display = 'block';
+  positionPopup();
+  fillListDetail(i, !!fromList);
+  highlightList(i);
+  dirty = true;
+}
+function selectAqi(j, fromList){
+  selected = { type: 'aqi', id: j };
+  var a = AQI[j];
+  var panel = document.getElementById('detailPanel');
+  panel.innerHTML = aqiDetailHTML(a);
+  panel.style.display = 'block';
+  positionPopup();
+  fillListDetailAqi(j, !!fromList);
+  dirty = true;
 }
 function row(k, v){ return '<div class="dp-item"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>'; }
 function closeDetail(){
   selected = null;
   document.getElementById('detailPanel').style.display = 'none';
+  document.getElementById('listDetail').classList.add('hidden');
   highlightList(-1);
   dirty = true;
 }
@@ -981,13 +1016,13 @@ function buildFires(){
       (inc.per != null ? '<span>' + inc.per + ' personnel</span>' : '') + '</div></div>';
   }).join('');
 }
-window.__orPick = function(i){ selectIncident(i); };
+window.__orPick = function(i){ selectIncident(i, true); };
 document.getElementById('fireSearch').addEventListener('input', buildFires);
 document.getElementById('fireSearch').addEventListener('keydown', function(e){
   if(e.key === 'Enter'){
     var q = this.value.toLowerCase();
     var m = INC.find(function(x){ return (x.n||'').toLowerCase().indexOf(q) >= 0; });
-    if(m) selectIncident(INC.indexOf(m));
+    if(m) selectIncident(INC.indexOf(m), true);
   }
 });
 // sort toggle on the tab title
@@ -1008,7 +1043,7 @@ function buildAir(){
       '<div class="aq-pm">PM2.5<br><b>' + a.v.toFixed(1) + '</b></div></div>';
   }).join('');
 }
-window.__orPickAqi = function(j){ selectAqi(j); };
+window.__orPickAqi = function(j){ selectAqi(j, true); };
 
 var ALERT_COLORS = {
   'Red Flag Warning': '#ff3b30',
