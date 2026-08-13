@@ -7,6 +7,8 @@ stdout = silent run; stdout IS the report).
 
 Usage:  python scripts/publish.py [--dry-run]
 """
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -36,7 +38,13 @@ def fingerprint(data):
 def main():
     t0 = time.time()
     sys.path.insert(0, HERE)
-    import collect  # noqa: E402 — bake first (writes index.html + data/snapshot.json)
+    import collect  # noqa: E402
+
+    # run the bake, capturing its output (kept out of our stdout so the
+    # "silent when unchanged" contract holds)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        collect.main()
 
     with open(SNAP, encoding="utf-8") as f:
         snap = json.load(f)
@@ -64,12 +72,6 @@ def main():
 
     with open(PREV, "w", encoding="utf-8") as f:
         json.dump(snap, f, separators=(",", ":"))
-    with open(os.path.join(ROOT, "data", "snapshot_prev.json.tmp"), "w") as f:
-        pass
-    try:
-        os.remove(os.path.join(ROOT, "data", "snapshot_prev.json.tmp"))
-    except OSError:
-        pass
 
     # ensure git identity for cron commits
     who = run(["git", "config", "user.name"])
