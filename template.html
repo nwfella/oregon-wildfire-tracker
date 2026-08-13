@@ -83,7 +83,7 @@
     font-size:10px; color:var(--dim); letter-spacing:.5px; background:rgba(10,12,17,.55);
     border:1px solid rgba(255,255,255,.07); border-radius:7px; padding:4px 8px;
   }
-  #map{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
+  #map{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;}
   #map.dragging{cursor:grabbing;}
   #mapControls{
     position:absolute; top:12px; right:12px; display:flex; flex-direction:column; gap:6px; z-index:5;
@@ -659,55 +659,78 @@ canvas.addEventListener('wheel', function(e){
 }, {passive:false});
 
 canvas.addEventListener('pointerdown', function(e){
-  canvas.setPointerCapture(e.pointerId);
-  pointers[e.pointerId] = { x: e.offsetX, y: e.offsetY };
+  try { canvas.setPointerCapture(e.pointerId); } catch(err){}
+  var r = canvas.getBoundingClientRect();
+  var x = e.clientX - r.left, y = e.clientY - r.top;
+  mouse.sx = x; mouse.sy = y;
+  pointers[e.pointerId] = { x: x, y: y };
   var keys = Object.keys(pointers);
   if(keys.length === 2){
-    pinch = { d: Math.hypot(pointers[keys[0]].x - pointers[keys[1]].x, pointers[keys[0]].y - pointers[keys[1]].y),
-              cx: (pointers[keys[0]].x + pointers[keys[1]].x)/2, cy: (pointers[keys[0]].y + pointers[keys[1]].y)/2,
-              s: view.s };
+    // second finger landed → enter pinch mode
+    drag = null;
+    canvas.classList.remove('dragging');
+    var p0 = pointers[keys[0]], p1 = pointers[keys[1]];
+    var m0x = (p0.x + p1.x) / 2, m0y = (p0.y + p1.y) / 2;
+    var w0 = toWorld(m0x, m0y);
+    pinch = {
+      d0: Math.hypot(p0.x - p1.x, p0.y - p1.y) || 1,
+      s0: view.s,
+      w0x: w0[0], w0y: w0[1]
+    };
   } else {
-    drag = { x: e.offsetX, y: e.offsetY, cx: view.cx, cy: view.cy, moved: false };
+    drag = { x: x, y: y, cx: view.cx, cy: view.cy, moved: false };
     canvas.classList.add('dragging');
   }
+  dirty = true;
 });
 canvas.addEventListener('pointermove', function(e){
-  mouse.sx = e.offsetX; mouse.sy = e.offsetY;
-  if(e.pointerId in pointers){
-    var old = pointers[e.pointerId];
-    if(pinch){
-      pointers[e.pointerId] = { x: e.offsetX, y: e.offsetY };
-      var keys = Object.keys(pointers);
-      var d = Math.hypot(pointers[keys[0]].x - pointers[keys[1]].x, pointers[keys[0]].y - pointers[keys[1]].y);
-      var mcx = (pointers[keys[0]].x + pointers[keys[1]].x)/2, mcy = (pointers[keys[0]].y + pointers[keys[1]].y)/2;
-      view.s = Math.min(400, Math.max(view.s*0.25, pinch.s * d / pinch.d));
-      var dwx = (mcx - pinch.cx)/view.s, dwy = (mcy - pinch.cy)/view.s;
-      view.cx = pinch.cx2 - dwx; view.cy = pinch.cy2 - dwy;
-    } else if(drag){
-      var dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
-      if(Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-      view.cx = drag.cx - dx / view.s;
-      view.cy = drag.cy - dy / view.s;
-    }
-    pointers[e.pointerId] = { x: e.offsetX, y: e.offsetY };
-    dirty = true;
+  var r = canvas.getBoundingClientRect();
+  var x = e.clientX - r.left, y = e.clientY - r.top;
+  mouse.sx = x; mouse.sy = y;
+  if(!(e.pointerId in pointers)){ dirty = true; return; }
+  var old = pointers[e.pointerId];
+  var dx = x - old.x, dy = y - old.y;
+  pointers[e.pointerId] = { x: x, y: y };
+  if(pinch && Object.keys(pointers).length >= 2){
+    var keys = Object.keys(pointers);
+    var p0 = pointers[keys[0]], p1 = pointers[keys[1]];
+    var d = Math.hypot(p0.x - p1.x, p0.y - p1.y) || 1;
+    var mcx = (p0.x + p1.x) / 2, mcy = (p0.y + p1.y) / 2;
+    // zoom by finger-distance ratio, keep the world point that was under the
+    // pinch midpoint anchored under the current midpoint (zoom + pan in one)
+    view.s = Math.min(400, Math.max(view.s * 0.25, pinch.s0 * d / pinch.d0));
+    view.cx = pinch.w0x - (mcx - W / 2) / view.s;
+    view.cy = pinch.w0y - (mcy - H / 2) / view.s;
+  } else if(drag){
+    if(Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    view.cx = drag.cx - dx / view.s;
+    view.cy = drag.cy - dy / view.s;
   }
+  dirty = true;
 });
 function endPointer(e){
+  var pos = pointers[e.pointerId];
   delete pointers[e.pointerId];
-  if(pinch && Object.keys(pointers).length < 2){
+  var n = Object.keys(pointers).length;
+  if(pinch && n === 1){
+    // one finger lifted mid-pinch → resume as a drag (never a click)
     var keys = Object.keys(pointers);
-    if(keys.length === 1){
-      pinch = { d: 1, cx: 0, cy: 0, s: view.s, cx2: view.cx, cy2: view.cy };
-      pointers[keys[0]] = { x: mouse.sx, y: mouse.sy };
-      drag = { x: mouse.sx, y: mouse.sy, cx: view.cx, cy: view.cy, moved: false };
-      canvas.classList.add('dragging');
-    } else pinch = null;
+    var last = pointers[keys[0]];
+    drag = { x: last.x, y: last.y, cx: view.cx, cy: view.cy, moved: true };
+    pinch = null;
+    canvas.classList.add('dragging');
+  } else if(pinch && n === 0){
+    pinch = null;
+    drag = null;
+    canvas.classList.remove('dragging');
   }
-  if(drag && !pinch && Object.keys(pointers).length === 0){
+  if(!pinch && drag && n === 0){
     if(!drag.moved){
-      // click → hit test
-      handleClick(mouse.sx, mouse.sy);
+      // click → hit test at the pointer's OWN last position (a tap may fire
+      // no pointermove at all, so mouse.sx/sy can be stale)
+      var sx = pos ? pos.x : mouse.sx;
+      var sy = pos ? pos.y : mouse.sy;
+      handleClick(sx, sy);
     }
     drag = null;
     canvas.classList.remove('dragging');
@@ -1061,7 +1084,7 @@ function boot(){
     }
     requestAnimationFrame(loop);
   })();
-  window.__dbg = function(){ return { loop: loopCount, err: lastErr }; };
+  window.__dbg = function(){ return { loop: loopCount, err: lastErr, s: view.s, cx: view.cx, cy: view.cy, W: W, H: H, ptrs: Object.keys(pointers).length, pinching: !!pinch, dragging: !!drag }; };
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
