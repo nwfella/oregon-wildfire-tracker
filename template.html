@@ -751,8 +751,11 @@ canvas.addEventListener('pointermove', function(e){
     view.cy = pinch.w0y - (mcy - H / 2) / view.s;
   } else if(drag){
     if(Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-    view.cx = drag.cx - dx / view.s;
-    view.cy = drag.cy - dy / view.s;
+    // incremental pan: accumulate per-event deltas on the current center
+    // (anchoring to drag.cx with per-event dx caused the map to jiggle
+    // and stay put after the first move event)
+    view.cx -= dx / view.s;
+    view.cy -= dy / view.s;
   }
   dirty = true;
 });
