@@ -18,7 +18,7 @@
   body{
     background:var(--bg); color:var(--text);
     font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    display:flex; flex-direction:column; min-height:100vh;
+    min-height:100vh;
   }
   header{
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
@@ -41,7 +41,7 @@
   .dot.err{background:var(--red);box-shadow:0 0 8px var(--red);}
   #stats{
     display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px;
-    padding:12px 20px; border-bottom:1px solid var(--border); background:var(--bg);
+    padding:14px 20px 0; width:100%; max-width:1400px; margin:0 auto;
   }
   .stat{
     background:var(--surface); border:1px solid var(--border); border-radius:12px;
@@ -52,20 +52,37 @@
   .stat .v small{font-size:12px; color:var(--muted); font-weight:600;}
   .stat .bar{position:absolute; left:0; bottom:0; height:2px; width:100%; background:var(--border);}
   .stat .bar i{display:block; height:2px; background:var(--accent); width:0%; transition:width .6s;}
-  #alertBar{padding:0 20px; display:flex; flex-direction:column; gap:6px; padding-top:12px;}
+  #alertBar{
+    padding:12px 20px 0; display:flex; flex-direction:row; gap:8px; overflow-x:auto;
+    width:100%; max-width:1400px; margin:0 auto; scrollbar-width:none;
+  }
+  #alertBar::-webkit-scrollbar{display:none;}
   .alert-chip{
     display:flex; align-items:center; gap:10px; border-radius:10px; padding:8px 14px; cursor:pointer;
-    border:1px solid; font-size:13px; transition:filter .15s;
+    border:1px solid; font-size:13px; transition:filter .15s; flex:none; max-width:420px;
   }
   .alert-chip:hover{filter:brightness(1.15);}
-  .alert-chip .a-icon{font-size:15px;}
-  .alert-chip .a-head{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .alert-chip .a-area{color:rgba(255,255,255,.75); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-left:auto; font-size:12px;}
+  .alert-chip .a-icon{font-size:15px; flex:none;}
+  .alert-chip .a-head{font-weight:700; flex:none;}
+  .alert-chip .a-headline{color:rgba(255,255,255,.85); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
+  .alert-chip .a-area{color:rgba(255,255,255,.6); flex:none; font-size:12px;}
   main{
-    flex:1; display:grid; grid-template-columns:minmax(0,1.9fr) minmax(340px,1fr); gap:14px;
-    padding:14px 20px; min-height:0;
+    display:block; padding:14px 20px 0; width:100%;
+    max-width:1400px; margin:0 auto;
   }
-  #mapWrap{position:relative; border:1px solid var(--border); border-radius:16px; overflow:hidden; background:#0b0e14; min-height:560px;}
+  #mapWrap{
+    position:relative; border:1px solid var(--border); border-radius:16px; overflow:hidden;
+    background:#0b0e14; min-height:600px; height:clamp(480px, 68vh, 780px);
+  }
+  #mapWrap.fs{
+    position:fixed; inset:0; z-index:1000; border-radius:0; border:0;
+    height:100vh; max-height:none; min-height:0;
+  }
+  #mapHint{
+    position:absolute; right:12px; bottom:12px; z-index:4; pointer-events:none;
+    font-size:10px; color:var(--dim); letter-spacing:.5px; background:rgba(10,12,17,.55);
+    border:1px solid rgba(255,255,255,.07); border-radius:7px; padding:4px 8px;
+  }
   #map{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
   #map.dragging{cursor:grabbing;}
   #mapControls{
@@ -124,7 +141,8 @@
   #detailPanel .dp-zoom:hover{background:rgba(255,107,26,.25);}
   #rail{
     display:flex; flex-direction:column; border:1px solid var(--border); border-radius:16px;
-    background:var(--surface); min-height:560px; overflow:hidden;
+    background:var(--surface); overflow:hidden; width:100%; max-width:1400px;
+    margin:14px auto 0;
   }
   .tabs{display:flex; border-bottom:1px solid var(--border);}
   .tab{
@@ -187,15 +205,30 @@
   footer a{color:var(--muted); text-decoration:none;}
   footer a:hover{color:var(--accent2);}
   footer .src{margin-left:auto; display:flex; gap:12px; flex-wrap:wrap;}
+  @media (min-width:1100px){
+    #fireList{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:8px;}
+    #fireList .f-item{margin-bottom:0;}
+    #airList,#alertList,#smokeList{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:8px;}
+    #airList .aq-item,#alertList .al-item,#smokeList .sm-item{margin-bottom:0;}
+  }
   @media (max-width:980px){
-    main{grid-template-columns:1fr;}
-    #mapWrap{min-height:440px;} #rail{min-height:480px;}
+    #mapWrap{min-height:440px;}
+  }
+  @media (max-width:640px){
+    #mapWrap{height:60vh; min-height:380px; border-radius:12px;}
+    main{padding:10px 12px 0;}
+    #rail{margin-top:10px; border-radius:12px;}
+    #stats{padding:10px 12px 0;}
+    #mapControls button{width:40px; height:40px; font-size:17px;}
+    #mapHint{display:none;}
+    header{padding:10px 14px;}
+    #detailPanel{top:8px; left:8px; width:calc(100% - 16px);}
   }
   @media (max-width:560px){
     #stats{grid-template-columns:repeat(2,1fr);}
     .pill{font-size:11px;}
     #legend{display:none;}
-    header{padding:10px 14px;} main{padding:10px 14px;}
+    header{padding:10px 14px;}
   }
 </style>
 </head>
@@ -215,7 +248,6 @@
   </div>
 </header>
 
-<section id="stats"></section>
 <section id="alertBar"></section>
 
 <main>
@@ -224,14 +256,20 @@
     <div id="mapControls">
       <button id="btnZoomIn" title="Zoom in">+</button>
       <button id="btnZoomOut" title="Zoom out">−</button>
-      <button id="btnFit" title="Fit Oregon">⛶</button>
+      <button id="btnFit" title="Fit Oregon">⟲</button>
+      <button id="btnFs" title="Maximize map to full screen">⛶</button>
+      <button id="btnFsExit" title="Exit full screen" style="display:none">✕</button>
     </div>
+    <div id="mapHint">drag to pan · scroll / pinch to zoom · tap a fire for details</div>
     <div id="legend"></div>
     <div id="mapHover"></div>
     <div id="detailPanel"></div>
   </div>
+</main>
 
-  <aside id="rail">
+<section id="stats"></section>
+
+<aside id="rail">
     <div class="tabs">
       <div class="tab active" data-tab="fires">FIRES<span class="cnt" id="cntFires"></span></div>
       <div class="tab" data-tab="air">AIR<span class="cnt" id="cntAir"></span></div>
@@ -246,7 +284,6 @@
     <div id="tab-alerts" class="tabpane hidden"><div id="alertList"></div></div>
     <div id="tab-smoke" class="tabpane hidden"><div id="smokeList"></div></div>
   </aside>
-</main>
 
 <footer>
   <span>🏔 Oregon Wildfire Tracker — a fully static snapshot. No live network calls; refresh happens server-side.</span>
@@ -775,6 +812,36 @@ function closeDetail(){
   dirty = true;
 }
 window.__orClose = closeDetail;
+
+/* ---------- full screen ---------- */
+function exitFsUI(){
+  var wrap = document.getElementById('mapWrap');
+  if(!wrap.classList.contains('fs')) return;
+  wrap.classList.remove('fs');
+  document.getElementById('btnFs').style.display = 'flex';
+  document.getElementById('btnFsExit').style.display = 'none';
+  resize(); fitView();
+}
+function toggleFs(){
+  var wrap = document.getElementById('mapWrap');
+  if(!wrap.classList.contains('fs')){
+    wrap.classList.add('fs');
+    document.getElementById('btnFs').style.display = 'none';
+    document.getElementById('btnFsExit').style.display = 'flex';
+    if(document.documentElement.requestFullscreen){
+      document.documentElement.requestFullscreen().catch(function(){});
+    }
+  } else {
+    exitFsUI();
+    if(document.exitFullscreen && document.fullscreenElement){
+      document.exitFullscreen().catch(function(){});
+    }
+  }
+  setTimeout(function(){ resize(); fitView(); }, 50);
+}
+document.addEventListener('fullscreenchange', function(){
+  if(!document.fullscreenElement) exitFsUI();
+});
 function highlightList(i){
   var items = document.querySelectorAll('#fireList .f-item');
   for(var j = 0; j < items.length; j++) items[j].classList.toggle('sel', j === i);
@@ -890,8 +957,8 @@ function buildAlertBar(){
     return '<div class="alert-chip" style="background:' + c + '22; border-color:' + c + '88;" onclick="switchTab(\'alerts\')">' +
       '<span class="a-icon">' + (ALERT_ICONS[a.e] || '⚠️') + '</span>' +
       '<span class="a-head" style="color:' + c + '">' + esc(a.e) + '</span>' +
-      '<span class="a-area">' + esc(a.h) + '</span>' +
-      '<span style="color:' + c + '; font-weight:800;">' + esc(a.a || '') + '</span></div>';
+      '<span class="a-headline">' + esc(a.h) + '</span>' +
+      '<span class="a-area">' + esc(a.a || '') + '</span></div>';
   }).join('');
 }
 
@@ -976,6 +1043,8 @@ function boot(){
   document.getElementById('btnZoomIn').addEventListener('click', function(){ zoomBy(1.6, W/2, H/2); });
   document.getElementById('btnZoomOut').addEventListener('click', function(){ zoomBy(1/1.6, W/2, H/2); });
   document.getElementById('btnFit').addEventListener('click', fitView);
+  document.getElementById('btnFs').addEventListener('click', toggleFs);
+  document.getElementById('btnFsExit').addEventListener('click', toggleFs);
   function zoomBy(f, sx, sy){
     view.s = Math.min(400, Math.max(view.s*0.25, view.s*f));
     view.cx = toWorld(sx, sy)[0] - (sx - W/2)/view.s;

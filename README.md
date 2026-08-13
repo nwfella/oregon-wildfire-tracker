@@ -8,7 +8,8 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 
 ## Features
 
-- **Canvas map of Oregon** — pan / zoom / pinch / dbl-click, county boundaries, city labels
+- **Hero map, top and center** — full-width canvas map of Oregon on page load; **⛶ maximizes it to full screen** (native Fullscreen API + CSS fallback, Esc/✕ to exit)
+- **Mobile-first** — 60vh touch map, pinch-zoom + drag pan, 40px tap targets, swipeable alert strip, responsive grid lists; everything below the fold stacks cleanly
 - **County burn-heat choropleth** — counties shaded by active fire acreage
 - **Active fires** — 97 incidents live from the NIFC/WFIGS feed: size, containment, cause,
   personnel, structures lost, complexity, discovery & last-report times
@@ -16,7 +17,7 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 - **Air quality** — PM2.5 readings from 100+ Oregon monitors (OpenAQ mirror), EPA AQI +
   category colors, worst-first ranking
 - **NWS alerts** — red flag warnings, fire weather watches, evacuations, air quality alerts,
-  heat warnings (color-coded banner strip + list)
+  heat warnings (color-coded swipe strip + list)
 - **Oregon Smoke Blog** — latest smoke outlook posts
 - **No-JS fallback** — static table of the top fires renders with JavaScript disabled
 - **Zero runtime network calls** — a cron refreshes the snapshot every 30 minutes
