@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oregon Wildfire Tracker — Live Fire Map & Air Quality</title>
+<meta name="description" content="Oregon wildfire tracker: active fires, perimeters, containment, air quality and red flag warnings. Static snapshot, updated every 30 minutes.">
+<style>
+  :root{
+    --bg:#0a0c11; --surface:#12151d; --surface2:#171b26; --border:#242a38;
+    --text:#e8ecf4; --muted:#8b93a7; --dim:#5c6478;
+    --accent:#ff6b1a; --accent2:#ffb347;
+    --green:#35e07f; --yellow:#ffd24d; --orange:#ff8c1a; --red:#ff3b30; --purple:#b45fd8; --maroon:#c9184a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding:14px 20px; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#141926 0%,#0d1017 100%);
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand .flame{font-size:26px; filter:drop-shadow(0 0 8px rgba(255,107,26,.55));}
+  .wordmark{font-weight:800; letter-spacing:2.5px; font-size:15px; color:var(--text);}
+  .wordmark b{color:var(--accent);}
+  .wordmark .sub{display:block; font-size:10px; letter-spacing:3px; color:var(--muted); font-weight:600; margin-top:1px;}
+  .statusbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .pill{
+    background:var(--surface); border:1px solid var(--border); border-radius:99px;
+    padding:6px 14px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;
+  }
+  .pill b{color:var(--text); font-variant-numeric:tabular-nums;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
+  .dot.stale{background:var(--yellow);box-shadow:0 0 8px var(--yellow);}
+  .dot.err{background:var(--red);box-shadow:0 0 8px var(--red);}
+  #stats{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px;
+    padding:12px 20px; border-bottom:1px solid var(--border); background:var(--bg);
+  }
+  .stat{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:10px 14px; position:relative; overflow:hidden;
+  }
+  .stat .k{font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:700;}
+  .stat .v{font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px;}
+  .stat .v small{font-size:12px; color:var(--muted); font-weight:600;}
+  .stat .bar{position:absolute; left:0; bottom:0; height:2px; width:100%; background:var(--border);}
+  .stat .bar i{display:block; height:2px; background:var(--accent); width:0%; transition:width .6s;}
+  #alertBar{padding:0 20px; display:flex; flex-direction:column; gap:6px; padding-top:12px;}
+  .alert-chip{
+    display:flex; align-items:center; gap:10px; border-radius:10px; padding:8px 14px; cursor:pointer;
+    border:1px solid; font-size:13px; transition:filter .15s;
+  }
+  .alert-chip:hover{filter:brightness(1.15);}
+  .alert-chip .a-icon{font-size:15px;}
+  .alert-chip .a-head{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .alert-chip .a-area{color:rgba(255,255,255,.75); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-left:auto; font-size:12px;}
+  main{
+    flex:1; display:grid; grid-template-columns:minmax(0,1.9fr) minmax(340px,1fr); gap:14px;
+    padding:14px 20px; min-height:0;
+  }
+  #mapWrap{position:relative; border:1px solid var(--border); border-radius:16px; overflow:hidden; background:#0b0e14; min-height:560px;}
+  #map{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
+  #map.dragging{cursor:grabbing;}
+  #mapControls{
+    position:absolute; top:12px; right:12px; display:flex; flex-direction:column; gap:6px; z-index:5;
+  }
+  #mapControls button{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--border);
+    background:rgba(18,21,29,.92); color:var(--text); font-size:16px; cursor:pointer; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #mapControls button:hover{background:var(--surface2); border-color:var(--accent);}
+  #legend{
+    position:absolute; left:12px; bottom:12px; z-index:5; background:rgba(13,16,23,.9);
+    border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:11px; color:var(--muted);
+    max-width:240px; backdrop-filter:blur(4px);
+  }
+  #legend .lg-title{font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text); font-size:10px; margin-bottom:6px;}
+  #legend .lg-row{display:flex; align-items:center; gap:8px; margin:3px 0;}
+  #legend .sw{width:14px; height:14px; border-radius:4px; flex:none;}
+  #legend .sw.circle{border-radius:50%;}
+  #legend .lg-row i{display:inline-block; width:22px; height:8px; border-radius:4px;}
+  #legend .lbl{flex:1;}
+  #mapHover{
+    position:absolute; pointer-events:none; z-index:6; background:rgba(13,16,23,.95);
+    border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:12px;
+    box-shadow:0 4px 16px rgba(0,0,0,.5); display:none; white-space:nowrap;
+  }
+  #mapHover .h-name{font-weight:700; color:var(--text);}
+  #mapHover .h-sub{color:var(--muted);}
+  #detailPanel{
+    position:absolute; top:12px; left:12px; z-index:7; width:320px; max-width:calc(100% - 24px);
+    background:rgba(15,18,26,.96); border:1px solid var(--accent); border-radius:14px;
+    box-shadow:0 10px 40px rgba(0,0,0,.6); display:none; max-height:calc(100% - 24px); overflow:auto;
+  }
+  #detailPanel .dp-head{
+    display:flex; align-items:flex-start; gap:10px; padding:14px 16px 10px;
+    border-bottom:1px solid var(--border);
+  }
+  #detailPanel .dp-name{font-size:17px; font-weight:800; line-height:1.2;}
+  #detailPanel .dp-cnty{font-size:12px; color:var(--muted); margin-top:2px;}
+  #detailPanel .dp-close{
+    margin-left:auto; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:6px;
+  }
+  #detailPanel .dp-close:hover{color:var(--text); background:var(--surface2);}
+  #detailPanel .dp-body{padding:12px 16px 14px;}
+  #detailPanel .dp-big{display:flex; gap:14px; align-items:baseline; margin-bottom:10px;}
+  #detailPanel .dp-acres{font-size:26px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums;}
+  #detailPanel .dp-acres small{font-size:11px; color:var(--muted); font-weight:600; letter-spacing:1px;}
+  #detailPanel .dp-cont{font-size:15px; font-weight:700;}
+  #detailPanel .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:7px 12px;}
+  #detailPanel .dp-item{}
+  #detailPanel .dp-item .k{font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); font-weight:700;}
+  #detailPanel .dp-item .v{font-size:13px; font-weight:600;}
+  #detailPanel .dp-zoom{margin-top:12px; width:100%; padding:8px; border-radius:9px; border:1px solid var(--accent);
+    background:rgba(255,107,26,.12); color:var(--accent2); font-weight:700; cursor:pointer; font-size:13px;}
+  #detailPanel .dp-zoom:hover{background:rgba(255,107,26,.25);}
+  #rail{
+    display:flex; flex-direction:column; border:1px solid var(--border); border-radius:16px;
+    background:var(--surface); min-height:560px; overflow:hidden;
+  }
+  .tabs{display:flex; border-bottom:1px solid var(--border);}
+  .tab{
+    flex:1; text-align:center; padding:11px 4px; font-size:11px; font-weight:800; letter-spacing:1.8px;
+    color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; user-select:none;
+  }
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .tab .cnt{color:var(--dim); font-weight:700; margin-left:3px;}
+  .tabpane{flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0;}
+  .tabpane.hidden{display:none;}
+  #fireSearch{
+    margin:10px 12px 6px; padding:9px 12px; border-radius:9px; border:1px solid var(--border);
+    background:var(--bg); color:var(--text); font-size:13px; outline:none;
+  }
+  #fireSearch:focus{border-color:var(--accent);}
+  #fireList,#airList,#alertList,#smokeList{overflow-y:auto; flex:1; padding:6px 8px 12px;}
+  .f-item{
+    border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:7px;
+    cursor:pointer; background:var(--surface2); transition:border-color .15s, transform .1s;
+  }
+  .f-item:hover{border-color:var(--accent); transform:translateY(-1px);}
+  .f-item.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .f-top{display:flex; align-items:baseline; gap:8px;}
+  .f-name{font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .f-cnty{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-left:auto; flex:none;}
+  .f-mid{display:flex; align-items:center; gap:8px; margin-top:6px;}
+  .f-acres{font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent2);}
+  .f-bar{flex:1; height:5px; border-radius:3px; background:var(--border); overflow:hidden;}
+  .f-bar i{display:block; height:100%; border-radius:3px;}
+  .f-cont{font-size:11px; font-weight:700; color:var(--muted); flex:none; font-variant-numeric:tabular-nums;}
+  .f-meta{font-size:10px; color:var(--dim); margin-top:5px; display:flex; gap:10px;}
+  .f-meta .dot2{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:4px; vertical-align:1px;}
+  .aq-item{display:flex; align-items:center; gap:10px; padding:8px 11px; border:1px solid var(--border); border-radius:10px; margin-bottom:6px; cursor:pointer; background:var(--surface2);}
+  .aq-item:hover{border-color:var(--accent2);}
+  .aq-badge{width:44px; height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#101418; flex:none;}
+  .aq-badge .aqv{font-size:15px; font-weight:800; line-height:1;}
+  .aq-badge .aql{font-size:7.5px; font-weight:800; letter-spacing:.5px; margin-top:2px;}
+  .aq-info{min-width:0;}
+  .aq-info .c{font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .aq-info .l{font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .aq-info .t{font-size:10px; color:var(--dim);}
+  .aq-pm{margin-left:auto; font-size:12px; color:var(--muted); flex:none; text-align:right;}
+  .al-item{border:1px solid var(--border); border-left:4px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:7px; background:var(--surface2);}
+  .al-item .al-event{font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:3px;}
+  .al-item .al-head{font-weight:700; font-size:13px;}
+  .al-item .al-area{font-size:11px; color:var(--muted); margin-top:3px;}
+  .al-item .al-meta{font-size:10px; color:var(--dim); margin-top:4px;}
+  .al-item a{color:var(--accent2); text-decoration:none; font-size:11px;}
+  .sm-item{border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-bottom:7px; background:var(--surface2);}
+  .sm-item .sm-date{font-size:10px; color:var(--dim); letter-spacing:1px; text-transform:uppercase;}
+  .sm-item .sm-title{font-weight:700; font-size:13px; margin:3px 0;}
+  .sm-item .sm-sum{font-size:11.5px; color:var(--muted); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .sm-item a{color:var(--accent2); font-size:11px; text-decoration:none; font-weight:600;}
+  .empty{padding:22px; text-align:center; color:var(--dim); font-size:12px;}
+  footer{
+    padding:12px 20px; border-top:1px solid var(--border); color:var(--dim); font-size:11px;
+    display:flex; gap:18px; flex-wrap:wrap; align-items:center; background:var(--bg);
+  }
+  footer a{color:var(--muted); text-decoration:none;}
+  footer a:hover{color:var(--accent2);}
+  footer .src{margin-left:auto; display:flex; gap:12px; flex-wrap:wrap;}
+  @media (max-width:980px){
+    main{grid-template-columns:1fr;}
+    #mapWrap{min-height:440px;} #rail{min-height:480px;}
+  }
+  @media (max-width:560px){
+    #stats{grid-template-columns:repeat(2,1fr);}
+    .pill{font-size:11px;}
+    #legend{display:none;}
+    header{padding:10px 14px;} main{padding:10px 14px;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="flame">🔥</span>
+    <div>
+      <div class="wordmark">OREGON <b>WILDFIRE</b> TRACKER</div>
+      <div class="sub">LIVE FIRE · PERIMETER · AIR QUALITY · ALERTS</div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span class="pill"><span id="liveDot" class="dot"></span><span id="liveLabel">snapshot</span></span>
+    <span class="pill">Updated <b id="updatedText">—</b></span>
+    <span class="pill">Data via <b>NIFC/WFIGS · NWS · OpenAQ</b></span>
+  </div>
+</header>
+
+<section id="stats"></section>
+<section id="alertBar"></section>
+
+<main>
+  <div id="mapWrap">
+    <canvas id="map"></canvas>
+    <div id="mapControls">
+      <button id="btnZoomIn" title="Zoom in">+</button>
+      <button id="btnZoomOut" title="Zoom out">−</button>
+      <button id="btnFit" title="Fit Oregon">⛶</button>
+    </div>
+    <div id="legend"></div>
+    <div id="mapHover"></div>
+    <div id="detailPanel"></div>
+  </div>
+
+  <aside id="rail">
+    <div class="tabs">
+      <div class="tab active" data-tab="fires">FIRES<span class="cnt" id="cntFires"></span></div>
+      <div class="tab" data-tab="air">AIR<span class="cnt" id="cntAir"></span></div>
+      <div class="tab" data-tab="alerts">ALERTS<span class="cnt" id="cntAlerts"></span></div>
+      <div class="tab" data-tab="smoke">SMOKE</div>
+    </div>
+    <div id="tab-fires" class="tabpane">
+      <input id="fireSearch" type="text" placeholder="🔎  Search fire name or county…">
+      <div id="fireList"></div>
+    </div>
+    <div id="tab-air" class="tabpane hidden"><div id="airList"></div></div>
+    <div id="tab-alerts" class="tabpane hidden"><div id="alertList"></div></div>
+    <div id="tab-smoke" class="tabpane hidden"><div id="smokeList"></div></div>
+  </aside>
+</main>
+
+<footer>
+  <span>🏔 Oregon Wildfire Tracker — a fully static snapshot. No live network calls; refresh happens server-side.</span>
+  <span class="src">
+    <a href="https://www.nifc.gov/fire-information" target="_blank" rel="noopener">NIFC/WFIGS</a>
+    <a href="https://api.weather.gov" target="_blank" rel="noopener">NWS API</a>
+    <a href="https://openaq.org" target="_blank" rel="noopener">OpenAQ</a>
+    <a href="https://oregonsmoke.blogspot.com/" target="_blank" rel="noopener">OR Smoke Blog</a>
+  </span>
+</footer>
+
+<noscript>
+  <div style="padding:20px; font-family:monospace; font-size:12px; color:#8b93a7;">
+    <h3 style="color:#e8ecf4;">Oregon Wildfire Tracker — static snapshot</h3>
+    <p style="margin:8px 0;">JavaScript is disabled. Here is the latest baked snapshot:</p>
+    <table style="border-collapse:collapse; width:100%; max-width:900px;">
+      <tr style="text-align:left; color:#ff6b1a;"><th style="padding:6px; border:1px solid #242a38;">Fire</th><th style="padding:6px; border:1px solid #242a38;">County</th><th style="padding:6px; border:1px solid #242a38;">Acres</th><th style="padding:6px; border:1px solid #242a38;">Contained</th><th style="padding:6px; border:1px solid #242a38;">Cause</th></tr>
+      <!--__STATIC_FIRES__-->
+    </table>
+    <p style="margin:10px 0; color:#5c6478;">Updated: <span id="noscriptUpdated">—</span>. Source: NIFC/WFIGS, NWS, OpenAQ.</p>
+  </div>
+</noscript>
+
+<script>
+/*__OR_FIRE_START__*/
+/*__OR_FIRE_END__*/
+</script>
+<script>
+(function(){
+"use strict";
+var D = (typeof OR_FIRE_DATA !== 'undefined' && OR_FIRE_DATA && OR_FIRE_DATA.incidents) ? OR_FIRE_DATA : null;
+
+/* ---------- helpers ---------- */
+function fmtAcres(n){
+  if(n == null) return '—';
+  if(n >= 1000) return Math.round(n).toLocaleString('en-US');
+  return String(Math.round(n));
+}
+function fmtDate(iso){
+  if(!iso) return '—';
+  var d = new Date(iso);
+  if(isNaN(d)) return '—';
+  return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+function timeAgo(iso){
+  if(!iso) return '';
+  var ms = Date.now() - new Date(iso).getTime();
+  if(isNaN(ms)) return '';
+  var m = Math.floor(ms/60000);
+  if(m < 1) return 'just now';
+  if(m < 60) return m + 'm ago';
+  var h = Math.floor(m/60);
+  if(h < 24) return h + 'h ago';
+  var d = Math.floor(h/24);
+  return d + 'd ago';
+}
+function esc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function contColor(c){
+  if(c == null) return '#888';
+  if(c >= 90) return '#35e07f';
+  if(c >= 50) return '#ffd24d';
+  if(c >= 25) return '#ff8c1a';
+  return '#ff3b30';
+}
+function contLabel(c){ return c == null ? 'n/a' : c + '%'; }
+
+/* ---------- projection ---------- */
+var LON0 = -124.8, LAT1 = 46.5, K = 111320, COSL = Math.cos(44.5*Math.PI/180);
+function proj(lon, lat){
+  return [ (lon - LON0) * COSL * K, (LAT1 - lat) * K ];
+}
+var view = { s: 1, cx: 0, cy: 0 };   // screen = (world - c) * s + center
+
+/* ---------- map state ---------- */
+var canvas, ctx, W, H, dpr;
+var hover = null, selected = null;   // incident ids or aqi indices
+var drag = null, pinch = null;
+var dirty = true;
+
+/* ---------- build lookup ---------- */
+var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [];
+if(D){
+  INC = D.incidents || [];
+  INC.forEach(function(inc){ INC_BY_NAME[(inc.n||'').toLowerCase()] = inc; });
+  AQI = D.aqi || [];
+  PERIM = D.perimeters || [];
+  CNTY = D.counties || [];
+  CITIES = D.cities || [];
+}
+var maxAcres = 1;
+INC.forEach(function(i){ if(i.acres > maxAcres) maxAcres = i.acres; });
+
+/* ---------- canvas setup ---------- */
+function resize(){
+  var wrap = document.getElementById('mapWrap');
+  canvas = document.getElementById('map');
+  dpr = window.devicePixelRatio || 1;
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  dirty = true;
+}
+function fitView(){
+  var ww = ( -116.3 - LON0 ) * COSL * K;
+  var wh = ( LAT1 - 41.9 ) * K;
+  view.s = Math.min(W/ww, H/wh) * 0.97;
+  var cxl = (-116.3 + LON0) / 2;   // center lon
+  var cyl = (LAT1 + 41.9) / 2;     // center lat
+  view.cx = (cxl - LON0) * COSL * K;
+  view.cy = (LAT1 - cyl) * K;
+  dirty = true;
+}
+
+/* ---------- geometry to screen ---------- */
+function toScreen(lon, lat){
+  var p = proj(lon, lat);
+  return [ (p[0] - view.cx) * view.s + W/2, (p[1] - view.cy) * view.s + H/2 ];
+}
+function toWorld(sx, sy){
+  return [ (sx - W/2)/view.s + view.cx, (sy - H/2)/view.s + view.cy ];
+}
+
+/* ---------- drawing ---------- */
+function drawCounties(){
+  // choropleth by burning acres (county.b)
+  var maxB = 1;
+  CNTY.forEach(function(c){ if(c.b > maxB) maxB = c.b; });
+  CNTY.forEach(function(c){
+    var t = c.b > 0 ? (Math.log(c.b+1)/Math.log(maxB+1)) : 0;
+    var col;
+    if(c.b <= 0) col = '#151922';
+    else {
+      var r = Math.round(90 + t*165), g = Math.round(40 + t*40), b = Math.round(20 + t*10);
+      col = 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    ctx.beginPath();
+    c.p.forEach(function(ring, ri){
+      var first = true;
+      ring.forEach(function(pt){
+        var s = toScreen(pt[0], pt[1]);
+        if(first){ ctx.moveTo(s[0], s[1]); first = false; }
+        else ctx.lineTo(s[0], s[1]);
+      });
+      ctx.closePath();
+    });
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.strokeStyle = c.b > 0 ? 'rgba(255,170,80,.55)' : '#2a303e';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // county label when zoomed
+    if(view.s > 2600){
+      var cx = 0, cy = 0, n = 0;
+      c.p.forEach(function(ring){ ring.forEach(function(pt){ var s = toScreen(pt[0],pt[1]); cx += s[0]; cy += s[1]; n++; }); });
+      ctx.fillStyle = 'rgba(139,147,167,.8)';
+      ctx.font = '600 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(c.n, cx/n, cy/n);
+    }
+  });
+}
+function drawPerimeters(){
+  var now = Date.now();
+  PERIM.forEach(function(p){
+    var sel = selected && selected.type === 'inc' && p.n === INC[selected.id].n;
+    var alpha = sel ? 0.5 : 0.22;
+    ctx.beginPath();
+    p.p.forEach(function(ring, ri){
+      var first = true;
+      ring.forEach(function(pt){
+        var s = toScreen(pt[0], pt[1]);
+        if(first){ ctx.moveTo(s[0], s[1]); first = false; }
+        else ctx.lineTo(s[0], s[1]);
+      });
+      ctx.closePath();
+    });
+    ctx.fillStyle = 'rgba(255,110,30,' + alpha + ')';
+    ctx.fill();
+    ctx.strokeStyle = sel ? 'rgba(255,190,90,.95)' : 'rgba(255,140,50,.7)';
+    ctx.lineWidth = sel ? 2 : 1.1;
+    ctx.stroke();
+    if(sel){
+      // pulse the selected perimeter
+      var ph = (now/400) % (Math.PI*2);
+      var glow = 0.3 + 0.3 * Math.sin(ph);
+      ctx.strokeStyle = 'rgba(255,180,60,' + glow + ')';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+  });
+}
+function drawIncidents(){
+  INC.forEach(function(inc, idx){
+    if(!inc.lat || !inc.lon) return;
+    var s = toScreen(inc.lon, inc.lat);
+    if(s[0] < -60 || s[0] > W+60 || s[1] < -60 || s[1] > H+60) return;
+    var r = 5 + 12 * Math.pow(inc.acres / maxAcres, 0.35);
+    var sel = selected && selected.type === 'inc' && selected.id === idx;
+    var isBig = inc.acres >= 20000;
+
+    // containment halo
+    var halo = contColor(inc.cont);
+    ctx.beginPath();
+    ctx.arc(s[0], s[1], r + 5, 0, Math.PI*2);
+    ctx.strokeStyle = halo;
+    ctx.globalAlpha = inc.cont < 50 ? (0.5 + 0.4*Math.sin(Date.now()/300 + idx)) : 0.75;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // flame glyph for big fires
+    if(isBig){
+      ctx.font = Math.max(14, r*2.4) + 'px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🔥', s[0], s[1]);
+      if(sel){
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(s[0], s[1], r + 8, 0, Math.PI*2); ctx.stroke();
+      }
+    } else {
+      var g = ctx.createRadialGradient(s[0]-r*0.3, s[1]-r*0.3, r*0.2, s[0], s[1], r);
+      g.addColorStop(0, '#ffd24d'); g.addColorStop(0.45, '#ff8c1a'); g.addColorStop(1, '#d93a00');
+      ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, Math.PI*2);
+      ctx.fillStyle = g; ctx.fill();
+      if(sel){
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(s[0], s[1], r + 3.5, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+
+    // label major fires
+    if(inc.acres >= 5000 || sel){
+      ctx.font = '700 10.5px sans-serif';
+      var label = inc.n;
+      var tw = ctx.measureText(label).width;
+      var ly = s[1] - r - 12;
+      ctx.fillStyle = 'rgba(10,12,17,.85)';
+      ctx.strokeStyle = 'rgba(255,107,26,.5)';
+      ctx.lineWidth = 1;
+      var bx = s[0] - tw/2 - 4, by = ly - 10;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(bx, by, tw+8, 17, 4) : ctx.rect(bx, by, tw+8, 17);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffe9d6';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, s[0], by + 8.5);
+    }
+  });
+}
+function drawAQI(){
+  AQI.forEach(function(a, idx){
+    if(!a.lat || !a.lon) return;
+    var s = toScreen(a.lon, a.lat);
+    if(s[0] < -20 || s[0] > W+20 || s[1] < -20 || s[1] > H+20) return;
+    var sel = hover && hover.type === 'aqi' && hover.id === idx;
+    var r = sel ? 7 : 4.8;
+    ctx.beginPath();
+    ctx.arc(s[0], s[1], r, 0, Math.PI*2);
+    ctx.fillStyle = a.c; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.2;
+    ctx.stroke();
+    if(sel){
+      ctx.beginPath(); ctx.arc(s[0], s[1], r + 4, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+  });
+}
+function drawCities(){
+  var showAll = view.s > 1500;
+  CITIES.forEach(function(c){
+    if(!showAll && !c.major) return;
+    var s = toScreen(c.lon, c.lat);
+    if(s[0] < 0 || s[0] > W || s[1] < 0 || s[1] > H) return;
+    ctx.beginPath(); ctx.arc(s[0], s[1], 1.8, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(150,160,185,.9)'; ctx.fill();
+    ctx.font = '600 9.5px sans-serif';
+    ctx.fillStyle = 'rgba(150,160,185,.75)';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(c.n, s[0] + 4, s[1] - 2);
+  });
+}
+function drawEmbers(){
+  // subtle drifting embers — pure decoration
+  if(!D) return;
+  var t = Date.now() / 1000;
+  for(var i = 0; i < 26; i++){
+    var seed = i * 137.508;
+    var x = (Math.sin(seed * 12.9898) * 43758.5453) % 1;
+    if(x < 0) x += 1;
+    var y = (Math.sin(seed * 78.233) * 12543.12) % 1;
+    if(y < 0) y += 1;
+    var px = ((x * 977 + t * 14) % W);
+    var py = H - ((y * 613 + t * (18 + (i % 5) * 6)) % H);
+    var a = 0.05 + 0.1 * ((Math.sin(seed + t * 2) + 1) / 2);
+    ctx.beginPath();
+    ctx.arc(px, py, 1.1 + (i % 3) * 0.5, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,140,60,' + a + ')';
+    ctx.fill();
+  }
+}
+function drawHover(){
+  hover = null;
+  if(!D) return;
+  var w = toWorld(mouse.sx, mouse.sy);
+  // incidents first
+  for(var i = INC.length - 1; i >= 0; i--){
+    var inc = INC[i];
+    if(!inc.lat || !inc.lon) continue;
+    var s = toScreen(inc.lon, inc.lat);
+    var r = 5 + 12 * Math.pow(inc.acres / maxAcres, 0.35) + 6;
+    var dx = s[0] - mouse.sx, dy = s[1] - mouse.sy;
+    if(dx*dx + dy*dy < r*r){ hover = {type:'inc', id:i, name:inc.n, sub:inc.cnty + ' · ' + fmtAcres(inc.acres) + ' ac · ' + contLabel(inc.cont) + ' contained'}; break; }
+  }
+  if(!hover){
+    for(var j = 0; j < AQI.length; j++){
+      var a = AQI[j];
+      if(!a.lat || !a.lon) continue;
+      var s2 = toScreen(a.lon, a.lat);
+      var dx2 = s2[0] - mouse.sx, dy2 = s2[1] - mouse.sy;
+      if(dx2*dx2 + dy2*dy2 < 64){ hover = {type:'aqi', id:j, name:a.c, sub:'PM2.5 ' + a.v.toFixed(1) + ' µg/m³ · AQI ' + a.aqi + ' (' + a.cat + ')'}; break; }
+    }
+  }
+  var el = document.getElementById('mapHover');
+  if(hover){
+    el.style.display = 'block';
+    el.innerHTML = '<div class="h-name">' + esc(hover.name) + '</div><div class="h-sub">' + esc(hover.sub) + '</div>';
+    var tx = mouse.sx + 14, ty = mouse.sy + 14;
+    if(tx + 220 > W) tx = mouse.sx - 230;
+    if(ty + 60 > H) ty = mouse.sy - 60;
+    el.style.left = tx + 'px'; el.style.top = ty + 'px';
+  } else el.style.display = 'none';
+}
+function render(){
+  ctx.clearRect(0, 0, W, H);
+  if(!D){
+    ctx.fillStyle = '#5c6478'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('No baked data — run scripts/collect.py to generate index.html', W/2, H/2);
+    return;
+  }
+  drawCounties();
+  drawPerimeters();
+  drawIncidents();
+  drawAQI();
+  drawCities();
+  drawHover();
+  drawEmbers();
+}
+
+/* ---------- interaction ---------- */
+var mouse = { sx: -9999, sy: -9999 };
+var pointers = {};
+
+function attachMapEvents(){
+  canvas.addEventListener('mousemove', function(e){
+    mouse.sx = e.offsetX; mouse.sy = e.offsetY;
+    dirty = true;
+  });
+  canvas.addEventListener('mouseleave', function(){ mouse.sx = -9999; mouse.sy = -9999; dirty = true; });
+
+canvas.addEventListener('wheel', function(e){
+  e.preventDefault();
+  var factor = Math.exp(-e.deltaY * 0.0016);
+  var ns = Math.min(400, Math.max(view.s * 0.25, view.s * factor));
+  factor = ns / view.s;
+  view.s = ns;
+  view.cx = toWorld(e.offsetX, e.offsetY)[0] - (e.offsetX - W/2) / view.s;
+  view.cy = toWorld(e.offsetX, e.offsetY)[1] - (e.offsetY - H/2) / view.s;
+  dirty = true;
+}, {passive:false});
+
+canvas.addEventListener('pointerdown', function(e){
+  canvas.setPointerCapture(e.pointerId);
+  pointers[e.pointerId] = { x: e.offsetX, y: e.offsetY };
+  var keys = Object.keys(pointers);
+  if(keys.length === 2){
+    pinch = { d: Math.hypot(pointers[keys[0]].x - pointers[keys[1]].x, pointers[keys[0]].y - pointers[keys[1]].y),
+              cx: (pointers[keys[0]].x + pointers[keys[1]].x)/2, cy: (pointers[keys[0]].y + pointers[keys[1]].y)/2,
+              s: view.s };
+  } else {
+    drag = { x: e.offsetX, y: e.offsetY, cx: view.cx, cy: view.cy, moved: false };
+    canvas.classList.add('dragging');
+  }
+});
+canvas.addEventListener('pointermove', function(e){
+  mouse.sx = e.offsetX; mouse.sy = e.offsetY;
+  if(e.pointerId in pointers){
+    var old = pointers[e.pointerId];
+    if(pinch){
+      pointers[e.pointerId] = { x: e.offsetX, y: e.offsetY };
+      var keys = Object.keys(pointers);
+      var d = Math.hypot(pointers[keys[0]].x - pointers[keys[1]].x, pointers[keys[0]].y - pointers[keys[1]].y);
+      var mcx = (pointers[keys[0]].x + pointers[keys[1]].x)/2, mcy = (pointers[keys[0]].y + pointers[keys[1]].y)/2;
+      view.s = Math.min(400, Math.max(view.s*0.25, pinch.s * d / pinch.d));
+      var dwx = (mcx - pinch.cx)/view.s, dwy = (mcy - pinch.cy)/view.s;
+      view.cx = pinch.cx2 - dwx; view.cy = pinch.cy2 - dwy;
+    } else if(drag){
+      var dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
+      if(Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      view.cx = drag.cx - dx / view.s;
+      view.cy = drag.cy - dy / view.s;
+    }
+    pointers[e.pointerId] = { x: e.offsetX, y: e.offsetY };
+    dirty = true;
+  }
+});
+function endPointer(e){
+  delete pointers[e.pointerId];
+  if(pinch && Object.keys(pointers).length < 2){
+    var keys = Object.keys(pointers);
+    if(keys.length === 1){
+      pinch = { d: 1, cx: 0, cy: 0, s: view.s, cx2: view.cx, cy2: view.cy };
+      pointers[keys[0]] = { x: mouse.sx, y: mouse.sy };
+      drag = { x: mouse.sx, y: mouse.sy, cx: view.cx, cy: view.cy, moved: false };
+      canvas.classList.add('dragging');
+    } else pinch = null;
+  }
+  if(drag && !pinch && Object.keys(pointers).length === 0){
+    if(!drag.moved){
+      // click → hit test
+      handleClick(mouse.sx, mouse.sy);
+    }
+    drag = null;
+    canvas.classList.remove('dragging');
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('dblclick', function(e){
+  var factor = 2;
+  view.s = Math.min(400, view.s * factor);
+  view.cx = toWorld(e.offsetX, e.offsetY)[0] - (e.offsetX - W/2) / view.s;
+  view.cy = toWorld(e.offsetX, e.offsetY)[1] - (e.offsetY - H/2) / view.s;
+  dirty = true;
+});
+}
+
+function handleClick(sx, sy){
+  var w = toWorld(sx, sy);
+  for(var i = INC.length - 1; i >= 0; i--){
+    var inc = INC[i];
+    if(!inc.lat || !inc.lon) continue;
+    var s = toScreen(inc.lon, inc.lat);
+    var r = 5 + 12 * Math.pow(inc.acres / maxAcres, 0.35) + 8;
+    var dx = s[0] - sx, dy = s[1] - sy;
+    if(dx*dx + dy*dy < r*r){ selectIncident(i); return; }
+  }
+  for(var j = 0; j < AQI.length; j++){
+    var a = AQI[j];
+    if(!a.lat || !a.lon) continue;
+    var s2 = toScreen(a.lon, a.lat);
+    var dx2 = s2[0] - sx, dy2 = s2[1] - sy;
+    if(dx2*dx2 + dy2*dy2 < 100){ selectAqi(j); return; }
+  }
+  closeDetail();
+}
+
+/* ---------- selection & detail ---------- */
+function selectIncident(i){
+  selected = { type: 'inc', id: i };
+  showDetail(i);
+  highlightList(i);
+  dirty = true;
+}
+function selectAqi(j){
+  selected = { type: 'aqi', id: j };
+  var a = AQI[j];
+  var panel = document.getElementById('detailPanel');
+  panel.innerHTML =
+    '<div class="dp-head"><div><div class="dp-name">🫁 ' + esc(a.c) + '</div>' +
+    '<div class="dp-cnty">' + esc(a.l || '') + '</div></div>' +
+    '<button class="dp-close" onclick="window.__orClose && window.__orClose()">✕</button></div>' +
+    '<div class="dp-body">' +
+    '<div class="dp-big"><span class="dp-acres" style="color:' + a.c + '">' + a.aqi + ' <small>AQI</small></span>' +
+    '<span class="dp-cont">' + esc(a.cat) + '</span></div>' +
+    '<div class="dp-grid">' +
+    '<div class="dp-item"><div class="k">PM2.5</div><div class="v">' + a.v.toFixed(1) + ' µg/m³</div></div>' +
+    '<div class="dp-item"><div class="k">Reading</div><div class="v">' + timeAgo(a.t) + '</div></div>' +
+    '</div></div>';
+  panel.style.display = 'block';
+  dirty = true;
+}
+function showDetail(i){
+  var inc = INC[i];
+  var panel = document.getElementById('detailPanel');
+  var p = PERIM.filter(function(x){ return x.n === inc.n; });
+  panel.innerHTML =
+    '<div class="dp-head"><div><div class="dp-name">🔥 ' + esc(inc.n) + '</div>' +
+    '<div class="dp-cnty">' + esc(inc.cnty || '—') + ' County, Oregon</div></div>' +
+    '<button class="dp-close" onclick="window.__orClose && window.__orClose()">✕</button></div>' +
+    '<div class="dp-body">' +
+    '<div class="dp-big"><span class="dp-acres">' + fmtAcres(inc.acres) + ' <small>ACRES</small></span>' +
+    '<span class="dp-cont" style="color:' + contColor(inc.cont) + '">' + contLabel(inc.cont) + ' contained</span></div>' +
+    '<div class="dp-grid">' +
+    row('Cause', inc.cause || '—') +
+    row('Type', inc.kind === 'WF' ? 'Wildfire' : (inc.kind || '—')) +
+    row('Personnel', inc.per != null ? inc.per + ' assigned' : '—') +
+    row('Structures lost', inc.struc != null && inc.struc > 0 ? inc.struc : 'none reported') +
+    row('Complexity', inc.comp || '—') +
+    row('Management', inc.mgmt || '—') +
+    row('Fuel', inc.fuel || '—') +
+    row('Discovered', fmtDate(inc.disp)) +
+    row('Last report', fmtDate(inc.rep)) +
+    row('Perimeter', p.length ? p.length + ' mapped' : 'not mapped') +
+    '</div>' +
+    (inc.cont != null && inc.cont < 50 ? '<div class="dp-zoom" style="margin-top:12px;color:#ffd24d;">⚠ Not yet contained — fire is actively spreading</div>' : '') +
+    '<button class="dp-zoom" id="dpZoom">⛶ Zoom to fire</button>' +
+    '</div>';
+  panel.style.display = 'block';
+  document.getElementById('dpZoom').onclick = function(){
+    var s = toScreen(inc.lon, inc.lat);
+    view.s = Math.min(400, Math.max(view.s, Math.min(W, H) * 0.15));
+    view.cx = inc.lon ? (inc.lon - LON0) * COSL * K : view.cx;
+    view.cy = inc.lat ? (LAT1 - inc.lat) * K : view.cy;
+    dirty = true;
+  };
+}
+function row(k, v){ return '<div class="dp-item"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>'; }
+function closeDetail(){
+  selected = null;
+  document.getElementById('detailPanel').style.display = 'none';
+  highlightList(-1);
+  dirty = true;
+}
+window.__orClose = closeDetail;
+function highlightList(i){
+  var items = document.querySelectorAll('#fireList .f-item');
+  for(var j = 0; j < items.length; j++) items[j].classList.toggle('sel', j === i);
+}
+
+/* ---------- sidebar ---------- */
+var sortMode = 'acres';
+function buildFires(){
+  var q = (document.getElementById('fireSearch').value || '').toLowerCase();
+  var list = INC.filter(function(inc){
+    if(!q) return true;
+    return (inc.n || '').toLowerCase().indexOf(q) >= 0 || (inc.cnty || '').toLowerCase().indexOf(q) >= 0;
+  });
+  list.sort(function(a, b){
+    if(sortMode === 'name') return (a.n || '').localeCompare(b.n || '');
+    if(sortMode === 'cont') return (a.cont == null ? 101 : a.cont) - (b.cont == null ? 101 : b.cont);
+    return (b.acres || 0) - (a.acres || 0);
+  });
+  var el = document.getElementById('fireList');
+  if(!list.length){ el.innerHTML = '<div class="empty">No fires match.</div>'; return; }
+  el.innerHTML = list.map(function(inc, i){
+    var idx = INC.indexOf(inc);
+    var w = Math.max(0, Math.min(100, (inc.acres / maxAcres) * 100));
+    var cc = contColor(inc.cont);
+    return '<div class="f-item' + (selected && selected.type === 'inc' && selected.id === idx ? ' sel' : '') + '" onclick="window.__orPick(' + idx + ')">' +
+      '<div class="f-top"><span class="f-name">' + esc(inc.n) + '</span><span class="f-cnty">' + esc(inc.cnty || '—') + '</span></div>' +
+      '<div class="f-mid"><span class="f-acres">' + fmtAcres(inc.acres) + '</span>' +
+      '<span class="f-bar"><i style="width:' + w + '%;background:' + cc + '"></i></span>' +
+      '<span class="f-cont" style="color:' + cc + '">' + contLabel(inc.cont) + '</span></div>' +
+      '<div class="f-meta"><span><span class="dot2" style="background:' + (inc.cont < 50 ? '#ff3b30' : inc.cont < 90 ? '#ffd24d' : '#35e07f') + '"></span>' +
+      (inc.cause || 'cause n/a') + '</span><span>discovered ' + timeAgo(inc.disp) + '</span>' +
+      (inc.per != null ? '<span>' + inc.per + ' personnel</span>' : '') + '</div></div>';
+  }).join('');
+}
+window.__orPick = function(i){ selectIncident(i); };
+document.getElementById('fireSearch').addEventListener('input', buildFires);
+document.getElementById('fireSearch').addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){
+    var q = this.value.toLowerCase();
+    var m = INC.find(function(x){ return (x.n||'').toLowerCase().indexOf(q) >= 0; });
+    if(m) selectIncident(INC.indexOf(m));
+  }
+});
+// sort toggle on the tab title
+document.querySelector('.tab[data-tab="fires"]').addEventListener('dblclick', function(){
+  sortMode = sortMode === 'acres' ? 'cont' : (sortMode === 'cont' ? 'name' : 'acres');
+  buildFires();
+});
+
+function buildAir(){
+  var list = AQI.slice().sort(function(a, b){ return b.v - a.v; });
+  var el = document.getElementById('airList');
+  if(!list.length){ el.innerHTML = '<div class="empty">No air quality readings in this snapshot.</div>'; return; }
+  el.innerHTML = list.map(function(a, j){
+    var idx = AQI.indexOf(a);
+    return '<div class="aq-item" onclick="window.__orPickAqi(' + idx + ')">' +
+      '<div class="aq-badge" style="background:' + a.c + '"><span class="aqv">' + a.aqi + '</span><span class="aql">' + esc(a.cat) + '</span></div>' +
+      '<div class="aq-info"><div class="c">' + esc(a.c) + '</div><div class="l">' + esc(a.l || '') + '</div><div class="t">updated ' + timeAgo(a.t) + '</div></div>' +
+      '<div class="aq-pm">PM2.5<br><b>' + a.v.toFixed(1) + '</b></div></div>';
+  }).join('');
+}
+window.__orPickAqi = function(j){ selectAqi(j); };
+
+var ALERT_COLORS = {
+  'Red Flag Warning': '#ff3b30',
+  'Fire Weather Watch': '#ff8c1a',
+  'Air Quality Alert': '#b45fd8',
+  'Evacuation': '#c9184a',
+  'Excessive Heat Warning': '#ffd24d',
+  'Heat Advisory': '#ffb347'
+};
+var ALERT_ICONS = {
+  'Red Flag Warning': '🚩',
+  'Fire Weather Watch': '🚩',
+  'Air Quality Alert': '😷',
+  'Evacuation': '🚨',
+  'Excessive Heat Warning': '🌡️',
+  'Heat Advisory': '🌡️'
+};
+function alertColor(e){ return ALERT_COLORS[e] || '#5c6478'; }
+function buildAlerts(){
+  var el = document.getElementById('alertList');
+  var alerts = (D && D.alerts) || [];
+  if(!alerts.length){ el.innerHTML = '<div class="empty">No active NWS alerts for Oregon right now.</div>'; return; }
+  el.innerHTML = alerts.map(function(a){
+    var c = alertColor(a.e);
+    return '<div class="al-item" style="border-left-color:' + c + '">' +
+      '<div class="al-event" style="color:' + c + '">' + (ALERT_ICONS[a.e] || '⚠️') + ' ' + esc(a.e) + '</div>' +
+      '<div class="al-head">' + esc(a.h) + '</div>' +
+      '<div class="al-area">📍 ' + esc(a.a || '') + '</div>' +
+      '<div class="al-meta">' + (a.on ? 'from ' + fmtDate(a.on) : '') + (a.ex ? ' · until ' + fmtDate(a.ex) : '') +
+      (a.url ? ' · <a href="' + esc(a.url) + '" target="_blank" rel="noopener">details ↗</a>' : '') + '</div></div>';
+  }).join('');
+}
+function buildSmoke(){
+  var el = document.getElementById('smokeList');
+  var posts = (D && D.smoke) || [];
+  if(!posts.length){ el.innerHTML = '<div class="empty">No smoke outlook posts in this snapshot.</div>'; return; }
+  el.innerHTML = posts.map(function(p){
+    return '<div class="sm-item"><div class="sm-date">' + esc(p.p) + '</div>' +
+      '<div class="sm-title">' + esc(p.t) + '</div>' +
+      '<div class="sm-sum">' + esc(p.s) + '</div>' +
+      (p.u ? '<a href="' + esc(p.u) + '" target="_blank" rel="noopener">read full outlook ↗</a>' : '') + '</div>';
+  }).join('');
+}
+function buildAlertBar(){
+  var bar = document.getElementById('alertBar');
+  var alerts = (D && D.alerts) || [];
+  if(!alerts.length){ bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = alerts.map(function(a){
+    var c = alertColor(a.e);
+    return '<div class="alert-chip" style="background:' + c + '22; border-color:' + c + '88;" onclick="switchTab(\'alerts\')">' +
+      '<span class="a-icon">' + (ALERT_ICONS[a.e] || '⚠️') + '</span>' +
+      '<span class="a-head" style="color:' + c + '">' + esc(a.e) + '</span>' +
+      '<span class="a-area">' + esc(a.h) + '</span>' +
+      '<span style="color:' + c + '; font-weight:800;">' + esc(a.a || '') + '</span></div>';
+  }).join('');
+}
+
+/* ---------- stats ---------- */
+function buildStats(){
+  var el = document.getElementById('stats');
+  var s = (D && D.stats) || {};
+  var totAcres = s.acres || 0;
+  var items = [
+    { k: 'Active fires', v: (s.fires || 0) + '', sub: 'in Oregon', bar: Math.min(100, (s.fires || 0) * 4), c: 'var(--accent)' },
+    { k: 'Acres burning', v: fmtAcres(totAcres) + ' <small>ac</small>', sub: 'active incidents', bar: 100, c: 'var(--accent2)' },
+    { k: 'Avg contained', v: (s.avgCont != null ? Math.round(s.avgCont) : '—') + '<small>%</small>', sub: 'across fires', bar: s.avgCont || 0, c: 'var(--green)' },
+    { k: 'Personnel', v: (s.per || 0) + '', sub: 'assigned', bar: Math.min(100, (s.per || 0) / 60), c: 'var(--yellow)' },
+    { k: 'New · 24h', v: (s.new24 || 0) + '', sub: 'discovered', bar: Math.min(100, (s.new24 || 0) * 30), c: 'var(--red)' },
+    { k: 'Red flags', v: (s.redFlags || 0) + '', sub: 'NWS warnings', bar: Math.min(100, (s.redFlags || 0) * 33), c: '#ff8c1a' },
+  ];
+  el.innerHTML = items.map(function(it){
+    return '<div class="stat"><div class="k">' + it.k + '</div><div class="v" style="color:' + it.c + '">' + it.v + '</div>' +
+      '<div class="bar"><i style="width:' + it.bar + '%;background:' + it.c + '"></i></div></div>';
+  }).join('');
+  document.getElementById('cntFires').textContent = (s.fires || 0);
+  document.getElementById('cntAir').textContent = AQI.length;
+  document.getElementById('cntAlerts').textContent = (D && D.alerts ? D.alerts.length : 0);
+}
+
+/* ---------- tabs ---------- */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tab') === name); });
+  ['fires','air','alerts','smoke'].forEach(function(t){
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+  });
+  if(name === 'fires') buildFires();
+  if(name === 'air') buildAir();
+  if(name === 'alerts') buildAlerts();
+  if(name === 'smoke') buildSmoke();
+}
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){ switchTab(t.getAttribute('data-tab')); });
+});
+
+/* ---------- legend ---------- */
+function buildLegend(){
+  var el = document.getElementById('legend');
+  el.innerHTML =
+    '<div class="lg-title">Legend</div>' +
+    '<div class="lg-row"><span class="sw circle" style="background:#ff3b30;"></span><span class="lbl">containment &lt; 25%</span></div>' +
+    '<div class="lg-row"><span class="sw circle" style="background:#ff8c1a;"></span><span class="lbl">25 – 50%</span></div>' +
+    '<div class="lg-row"><span class="sw circle" style="background:#ffd24d;"></span><span class="lbl">50 – 90%</span></div>' +
+    '<div class="lg-row"><span class="sw circle" style="background:#35e07f;"></span><span class="lbl">≥ 90%</span></div>' +
+    '<div class="lg-row"><i style="background:#ff7a2a;"></i><span class="lbl">fire perimeter</span></div>' +
+    '<div class="lg-row"><span class="sw" style="background:#7a2a05;"></span><span class="lbl">county burn heat</span></div>' +
+    '<div class="lg-row"><span class="sw circle" style="background:#b45fd8;"></span><span class="lbl">AQI monitor (PM2.5)</span></div>';
+}
+
+/* ---------- boot ---------- */
+function boot(){
+  resize();
+  attachMapEvents();
+  fitView();
+  if(!D){
+    document.getElementById('liveDot').className = 'dot err';
+    document.getElementById('liveLabel').textContent = 'NO DATA';
+    document.getElementById('updatedText').textContent = 'run scripts/collect.py';
+    render();
+    return;
+  }
+  var upd = D.updated;
+  document.getElementById('updatedText').textContent = fmtDate(upd) + ' · ' + timeAgo(upd);
+  var ageH = (Date.now() - new Date(upd).getTime()) / 3600000;
+  if(ageH > 6){ document.getElementById('liveDot').className = 'dot stale'; document.getElementById('liveLabel').textContent = 'stale snapshot'; }
+  else { document.getElementById('liveDot').className = 'dot'; document.getElementById('liveLabel').textContent = 'live snapshot'; }
+  buildLegend();
+  buildStats();
+  buildAlertBar();
+  buildFires();
+  buildAir();
+  buildAlerts();
+  buildSmoke();
+  var nsU = document.getElementById('noscriptUpdated');
+  if(nsU) nsU.textContent = fmtDate(upd);
+  window.addEventListener('resize', function(){ resize(); fitView(); });
+  document.getElementById('btnZoomIn').addEventListener('click', function(){ zoomBy(1.6, W/2, H/2); });
+  document.getElementById('btnZoomOut').addEventListener('click', function(){ zoomBy(1/1.6, W/2, H/2); });
+  document.getElementById('btnFit').addEventListener('click', fitView);
+  function zoomBy(f, sx, sy){
+    view.s = Math.min(400, Math.max(view.s*0.25, view.s*f));
+    view.cx = toWorld(sx, sy)[0] - (sx - W/2)/view.s;
+    view.cy = toWorld(sx, sy)[1] - (sy - H/2)/view.s;
+    dirty = true;
+  }
+  // animation loop
+  var loopCount = 0, lastErr = null;
+  (function loop(){
+    loopCount++;
+    if(dirty){
+      try { render(); } catch(e){ lastErr = e && e.message ? e.message : String(e); }
+      dirty = false;
+    }
+    requestAnimationFrame(loop);
+  })();
+  window.__dbg = function(){ return { loop: loopCount, err: lastErr }; };
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+})();
+</script>
+</body>
+</html>
