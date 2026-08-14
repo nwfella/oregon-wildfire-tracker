@@ -14,6 +14,30 @@
     --accent:#ff6b1a; --accent2:#ffb347;
     --green:#35e07f; --yellow:#ffd24d; --orange:#ff8c1a; --red:#ff3b30; --purple:#b45fd8; --maroon:#c9184a;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:linear-gradient(180deg,#141926 0%,#0d1017 100%);
+    --overlay-bg:rgba(13,16,23,.92);
+    --ctrl-bg:rgba(18,21,29,.92);
+    --chip-text:rgba(255,255,255,.85);
+    --chip-area:rgba(255,255,255,.6);
+    --warn:#ffd24d;
+    --map-bg:#0b0e14;
+    --map-county:#151922;
+    --map-stroke:#3a4254;
+    --map-stroke-burn:rgba(255,170,80,.55);
+    --map-burn-a:#5a2814; --map-burn-b:#ff501e;
+    --map-perim-fill:rgba(255,110,30,.22);
+    --map-perim-fill-sel:rgba(255,110,30,.5);
+    --map-perim-stroke:rgba(255,140,50,.7);
+    --map-perim-stroke-sel:rgba(255,190,90,.95);
+    --map-perim-pulse:255,180,60;
+    --map-marker-hi:#ffd24d; --map-marker-mid:#ff8c1a; --map-marker-lo:#d93a00;
+    --map-city:rgba(150,160,185,.9); --map-city-text:rgba(150,160,185,.75);
+    --map-label-bg:rgba(10,12,17,.85); --map-label-text:#ffe9d6;
+    --map-ember:255,140,60;
+    --map-outline-casing:rgba(8,10,15,.9);
+    --map-outline-glow:rgba(255,140,60,.35);
+    --map-outline-border:rgba(228,236,250,.95);
+    --map-outline-shadow:rgba(255,140,60,.5);
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
@@ -25,7 +49,7 @@
   header{
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     padding:14px 20px; border-bottom:1px solid var(--border);
-    background:linear-gradient(180deg,#141926 0%,#0d1017 100%);
+    background:var(--header-bg);
   }
   .brand{display:flex; align-items:center; gap:12px;}
   .brand .flame{font-size:26px; filter:drop-shadow(0 0 8px rgba(255,107,26,.55));}
@@ -66,15 +90,15 @@
   .alert-chip:hover{filter:brightness(1.15);}
   .alert-chip .a-icon{font-size:15px; flex:none;}
   .alert-chip .a-head{font-weight:700; flex:none;}
-  .alert-chip .a-headline{color:rgba(255,255,255,.85); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
-  .alert-chip .a-area{color:rgba(255,255,255,.6); flex:none; font-size:12px;}
+  .alert-chip .a-headline{color:var(--chip-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
+  .alert-chip .a-area{color:var(--chip-area); flex:none; font-size:12px;}
   main{
     display:block; padding:14px 20px 0; width:100%;
     max-width:1400px; margin:0 auto;
   }
   #mapWrap{
     position:relative; border:1px solid var(--border); border-radius:16px; overflow:hidden;
-    background:#0b0e14; min-height:600px; height:clamp(480px, 68vh, 780px);
+    background:var(--map-bg); min-height:600px; height:clamp(480px, 68vh, 780px);
   }
   #mapWrap.fs{
     position:fixed; inset:0; z-index:1000; border-radius:0; border:0;
@@ -82,7 +106,7 @@
   }
   #mapHint{
     position:absolute; right:12px; bottom:12px; z-index:4; pointer-events:none;
-    font-size:10px; color:var(--dim); letter-spacing:.5px; background:rgba(10,12,17,.55);
+    font-size:10px; color:var(--dim); letter-spacing:.5px; background:var(--ctrl-bg);
     border:1px solid rgba(255,255,255,.07); border-radius:7px; padding:4px 8px;
   }
   #map{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;}
@@ -92,12 +116,12 @@
   }
   #mapControls button{
     width:34px; height:34px; border-radius:9px; border:1px solid var(--border);
-    background:rgba(18,21,29,.92); color:var(--text); font-size:16px; cursor:pointer; line-height:1;
+    background:var(--ctrl-bg); color:var(--text); font-size:16px; cursor:pointer; line-height:1;
     display:flex; align-items:center; justify-content:center;
   }
   #mapControls button:hover{background:var(--surface2); border-color:var(--accent);}
   #legend{
-    position:absolute; left:12px; bottom:12px; z-index:5; background:rgba(13,16,23,.9);
+    position:absolute; left:12px; bottom:12px; z-index:5; background:var(--overlay-bg);
     border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:11px; color:var(--muted);
     max-width:240px; backdrop-filter:blur(4px);
   }
@@ -108,7 +132,7 @@
   #legend .lg-row i{display:inline-block; width:22px; height:8px; border-radius:4px;}
   #legend .lbl{flex:1;}
   #mapHover{
-    position:absolute; pointer-events:none; z-index:6; background:rgba(13,16,23,.95);
+    position:absolute; pointer-events:none; z-index:6; background:var(--overlay-bg);
     border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:12px;
     box-shadow:0 4px 16px rgba(0,0,0,.5); display:none; white-space:nowrap;
   }
@@ -116,7 +140,7 @@
   #mapHover .h-sub{color:var(--muted);}
   #detailPanel{
     position:absolute; z-index:7; width:300px; max-width:calc(100% - 20px);
-    background:rgba(15,18,26,.97); border:1px solid var(--accent); border-radius:12px;
+    background:var(--overlay-bg); border:1px solid var(--accent); border-radius:12px;
     box-shadow:0 10px 40px rgba(0,0,0,.65); display:none;
     max-height:calc(100% - 24px); overflow:auto;
   }
@@ -244,6 +268,97 @@
     #legend{display:none;}
     header{padding:10px 14px;}
   }
+  /* ---- theme picker ---- */
+  .themes{display:flex; gap:6px; align-items:center;}
+  .th{
+    width:22px; height:22px; border-radius:50%; border:2px solid var(--border); cursor:pointer;
+    padding:0; transition:transform .12s, border-color .12s;
+  }
+  .th:hover{transform:scale(1.18);}
+  .th.active{border-color:var(--text); box-shadow:0 0 8px var(--accent);}
+  .th-ember{background:linear-gradient(135deg,#ff6b1a,#b3242c);}
+  .th-forest{background:linear-gradient(135deg,#35d07f,#14532d);}
+  .th-ocean{background:linear-gradient(135deg,#38b6ff,#1e3a8a);}
+  .th-magma{background:linear-gradient(135deg,#ff8c42,#7c1d10);}
+  .th-daybreak{background:linear-gradient(135deg,#ffffff,#aab4c8);}
+  /* ---- themes ---- */
+  body.theme-forest{
+    --bg:#0a120d; --surface:#101b14; --surface2:#15241b; --border:#24382b;
+    --text:#e6f2e9; --muted:#8fa894; --dim:#5f7a67;
+    --accent:#35d07f; --accent2:#8fe3ae;
+    --header-bg:linear-gradient(180deg,#0f2318 0%,#09120c 100%);
+    --overlay-bg:rgba(11,20,15,.92); --ctrl-bg:rgba(14,25,19,.92);
+    --chip-text:rgba(235,255,242,.85); --chip-area:rgba(235,255,242,.6);
+    --map-bg:#0b1410; --map-county:#13241a; --map-stroke:#2e4a39;
+    --map-stroke-burn:rgba(255,170,80,.55);
+    --map-burn-a:#1e2c1f; --map-burn-b:#ff6a2a;
+    --map-perim-fill:rgba(255,130,40,.22); --map-perim-fill-sel:rgba(255,130,40,.5);
+    --map-perim-stroke:rgba(255,150,60,.72); --map-perim-stroke-sel:rgba(255,190,90,.95);
+    --map-perim-pulse:255,180,70;
+    --map-city:rgba(150,190,165,.9); --map-city-text:rgba(150,190,165,.75);
+    --map-label-bg:rgba(9,17,13,.85); --map-label-text:#eafff0;
+    --map-ember:255,150,70;
+    --map-outline-casing:rgba(6,12,9,.9); --map-outline-glow:rgba(255,150,60,.32);
+    --map-outline-border:rgba(212,240,222,.95); --map-outline-shadow:rgba(255,150,60,.45);
+  }
+  body.theme-ocean{
+    --bg:#0a0f16; --surface:#101926; --surface2:#152132; --border:#23344a;
+    --text:#e6eefb; --muted:#8fa4c0; --dim:#5f7391;
+    --accent:#38b6ff; --accent2:#7cd4ff;
+    --header-bg:linear-gradient(180deg,#0f1b2e 0%,#090d16 100%);
+    --overlay-bg:rgba(11,17,27,.92); --ctrl-bg:rgba(14,21,32,.92);
+    --chip-text:rgba(235,244,255,.85); --chip-area:rgba(235,244,255,.6);
+    --map-bg:#0b1018; --map-county:#131c29; --map-stroke:#2e3f56;
+    --map-stroke-burn:rgba(255,170,80,.55);
+    --map-burn-a:#17263a; --map-burn-b:#ff6a2a;
+    --map-perim-fill:rgba(255,130,40,.22); --map-perim-fill-sel:rgba(255,130,40,.5);
+    --map-perim-stroke:rgba(255,150,60,.72); --map-perim-stroke-sel:rgba(255,190,90,.95);
+    --map-perim-pulse:255,180,70;
+    --map-city:rgba(150,175,205,.9); --map-city-text:rgba(150,175,205,.75);
+    --map-label-bg:rgba(9,14,22,.85); --map-label-text:#eaf4ff;
+    --map-ember:255,150,70;
+    --map-outline-casing:rgba(6,10,16,.9); --map-outline-glow:rgba(90,190,255,.3);
+    --map-outline-border:rgba(215,230,250,.95); --map-outline-shadow:rgba(90,190,255,.4);
+  }
+  body.theme-magma{
+    --bg:#140c08; --surface:#1e1410; --surface2:#291a13; --border:#3e2b1d;
+    --text:#fdf0e6; --muted:#c8a88e; --dim:#93725a;
+    --accent:#ff8c42; --accent2:#ffc46b;
+    --header-bg:linear-gradient(180deg,#261509 0%,#120a05 100%);
+    --overlay-bg:rgba(26,16,10,.92); --ctrl-bg:rgba(32,20,12,.92);
+    --chip-text:rgba(255,240,225,.85); --chip-area:rgba(255,240,225,.6);
+    --map-bg:#171009; --map-county:#241a10; --map-stroke:#4a3422;
+    --map-stroke-burn:rgba(255,180,90,.55);
+    --map-burn-a:#38200e; --map-burn-b:#ff9a3d;
+    --map-perim-fill:rgba(255,120,40,.25); --map-perim-fill-sel:rgba(255,130,40,.52);
+    --map-perim-stroke:rgba(255,150,60,.75); --map-perim-stroke-sel:rgba(255,200,110,.95);
+    --map-perim-pulse:255,190,80;
+    --map-city:rgba(210,170,140,.9); --map-city-text:rgba(210,170,140,.75);
+    --map-label-bg:rgba(24,15,9,.85); --map-label-text:#fff0e0;
+    --map-ember:255,170,90;
+    --map-outline-casing:rgba(16,9,5,.9); --map-outline-glow:rgba(255,150,60,.4);
+    --map-outline-border:rgba(255,220,180,.95); --map-outline-shadow:rgba(255,150,60,.5);
+  }
+  body.theme-daybreak{
+    --bg:#eef1f6; --surface:#ffffff; --surface2:#e9edf3; --border:#d3dae6;
+    --text:#1c2333; --muted:#5c6a85; --dim:#8a94a8;
+    --accent:#e8621a; --accent2:#c9560f;
+    --header-bg:linear-gradient(180deg,#ffffff 0%,#e9edf3 100%);
+    --overlay-bg:rgba(255,255,255,.94); --ctrl-bg:rgba(255,255,255,.9);
+    --chip-text:rgba(28,35,51,.92); --chip-area:rgba(28,35,51,.65);
+    --warn:#a36b00;
+    --map-bg:#e8ecf3; --map-county:#dde3ec; --map-stroke:#b9c2d2;
+    --map-stroke-burn:rgba(210,90,30,.6);
+    --map-burn-a:#eadcc8; --map-burn-b:#ff6a2a;
+    --map-perim-fill:rgba(255,110,30,.28); --map-perim-fill-sel:rgba(255,110,30,.5);
+    --map-perim-stroke:rgba(200,80,25,.85); --map-perim-stroke-sel:rgba(160,60,15,.95);
+    --map-perim-pulse:200,80,25;
+    --map-city:rgba(80,95,120,.9); --map-city-text:rgba(80,95,120,.8);
+    --map-label-bg:rgba(255,255,255,.92); --map-label-text:#4a3a2a;
+    --map-ember:200,90,40;
+    --map-outline-casing:rgba(255,255,255,.95); --map-outline-glow:rgba(255,130,50,.28);
+    --map-outline-border:#37425c; --map-outline-shadow:rgba(255,130,50,.35);
+  }
 </style>
 </head>
 <body>
@@ -256,6 +371,13 @@
     </div>
   </div>
   <div class="statusbar">
+    <div class="themes" title="Theme">
+      <button class="th th-ember active" data-theme="ember" title="Ember (default)"></button>
+      <button class="th th-forest" data-theme="forest" title="Forest green"></button>
+      <button class="th th-ocean" data-theme="ocean" title="Ocean blue"></button>
+      <button class="th th-magma" data-theme="magma" title="Magma sunset"></button>
+      <button class="th th-daybreak" data-theme="daybreak" title="Daybreak (light)"></button>
+    </div>
     <span class="pill"><span id="liveDot" class="dot"></span><span id="liveLabel">snapshot</span></span>
     <span class="pill">Updated <b id="updatedText">—</b></span>
     <span class="pill">Data via <b>NIFC/WFIGS · NWS · OpenAQ</b></span>
@@ -392,6 +514,58 @@ if(D){
 var maxAcres = 1;
 INC.forEach(function(i){ if(i.acres > maxAcres) maxAcres = i.acres; });
 
+/* ---------- theme ---------- */
+var MAPT = {};
+function hexRgb(h){
+  h = String(h).replace('#','');
+  if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  return [parseInt(h.substr(0,2),16)||0, parseInt(h.substr(2,2),16)||0, parseInt(h.substr(4,2),16)||0];
+}
+function lerpColor(a, b, t){
+  var ca = hexRgb(a), cb = hexRgb(b);
+  return 'rgb(' + Math.round(ca[0]+(cb[0]-ca[0])*t) + ',' +
+    Math.round(ca[1]+(cb[1]-ca[1])*t) + ',' + Math.round(ca[2]+(cb[2]-ca[2])*t) + ')';
+}
+function readMapTheme(){
+  var cs = getComputedStyle(document.body);
+  function v(name, fb){ var x = cs.getPropertyValue(name).trim(); return x || fb; }
+  MAPT = {
+    county: v('--map-county', '#151922'),
+    stroke: v('--map-stroke', '#3a4254'),
+    strokeBurn: v('--map-stroke-burn', 'rgba(255,170,80,.55)'),
+    burnA: v('--map-burn-a', '#5a2814'),
+    burnB: v('--map-burn-b', '#ff501e'),
+    perimFill: v('--map-perim-fill', 'rgba(255,110,30,.22)'),
+    perimFillSel: v('--map-perim-fill-sel', 'rgba(255,110,30,.5)'),
+    perimStroke: v('--map-perim-stroke', 'rgba(255,140,50,.7)'),
+    perimStrokeSel: v('--map-perim-stroke-sel', 'rgba(255,190,90,.95)'),
+    perimPulse: v('--map-perim-pulse', '255,180,60'),
+    markerHi: v('--map-marker-hi', '#ffd24d'),
+    markerMid: v('--map-marker-mid', '#ff8c1a'),
+    markerLo: v('--map-marker-lo', '#d93a00'),
+    labelBg: v('--map-label-bg', 'rgba(10,12,17,.85)'),
+    labelText: v('--map-label-text', '#ffe9d6'),
+    city: v('--map-city', 'rgba(150,160,185,.9)'),
+    cityText: v('--map-city-text', 'rgba(150,160,185,.75)'),
+    ember: v('--map-ember', '255,140,60'),
+    outlineCasing: v('--map-outline-casing', 'rgba(8,10,15,.9)'),
+    outlineGlow: v('--map-outline-glow', 'rgba(255,140,60,.35)'),
+    outlineBorder: v('--map-outline-border', 'rgba(228,236,250,.95)'),
+    outlineShadow: v('--map-outline-shadow', 'rgba(255,140,60,.5)')
+  };
+  dirty = true;
+}
+function setTheme(name){
+  document.body.className = 'theme-' + name;
+  try{ localStorage.setItem('or-theme', name); }catch(e){}
+  readMapTheme();
+  buildLegend();
+  document.querySelectorAll('.th').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-theme') === name);
+  });
+  dirty = true;
+}
+
 /* ---------- canvas setup ---------- */
 function resize(){
   var wrap = document.getElementById('mapWrap');
@@ -432,11 +606,8 @@ function drawCounties(){
   CNTY.forEach(function(c){
     var t = c.b > 0 ? (Math.log(c.b+1)/Math.log(maxB+1)) : 0;
     var col;
-    if(c.b <= 0) col = '#151922';
-    else {
-      var r = Math.round(90 + t*165), g = Math.round(40 + t*40), b = Math.round(20 + t*10);
-      col = 'rgb(' + r + ',' + g + ',' + b + ')';
-    }
+    if(c.b <= 0) col = MAPT.county;
+    else col = lerpColor(MAPT.burnA, MAPT.burnB, t);
     ctx.beginPath();
     c.p.forEach(function(ring, ri){
       var first = true;
@@ -449,14 +620,14 @@ function drawCounties(){
     });
     ctx.fillStyle = col;
     ctx.fill();
-    ctx.strokeStyle = c.b > 0 ? 'rgba(255,170,80,.55)' : '#3a4254';
+    ctx.strokeStyle = c.b > 0 ? MAPT.strokeBurn : MAPT.stroke;
     ctx.lineWidth = 1;
     ctx.stroke();
     // county label when zoomed
     if(view.s > 2600){
       var cx = 0, cy = 0, n = 0;
       c.p.forEach(function(ring){ ring.forEach(function(pt){ var s = toScreen(pt[0],pt[1]); cx += s[0]; cy += s[1]; n++; }); });
-      ctx.fillStyle = 'rgba(139,147,167,.8)';
+      ctx.fillStyle = MAPT.cityText;
       ctx.font = '600 10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(c.n, cx/n, cy/n);
@@ -480,21 +651,21 @@ function drawStateOutline(){
   }
   trace();
   // dark casing — separates the state from counties/background
-  ctx.strokeStyle = 'rgba(8,10,15,.9)';
+  ctx.strokeStyle = MAPT.outlineCasing;
   ctx.lineWidth = 7;
   ctx.stroke();
   // soft ember glow
   ctx.save();
-  ctx.shadowColor = 'rgba(255,140,60,.5)';
+  ctx.shadowColor = MAPT.outlineShadow;
   ctx.shadowBlur = 12;
   trace();
-  ctx.strokeStyle = 'rgba(255,140,60,.35)';
+  ctx.strokeStyle = MAPT.outlineGlow;
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.restore();
   // crisp bright border on top
   trace();
-  ctx.strokeStyle = 'rgba(228,236,250,.95)';
+  ctx.strokeStyle = MAPT.outlineBorder;
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -502,7 +673,6 @@ function drawPerimeters(){
   var now = Date.now();
   PERIM.forEach(function(p){
     var sel = selected && selected.type === 'inc' && p.n === INC[selected.id].n;
-    var alpha = sel ? 0.5 : 0.22;
     ctx.beginPath();
     p.p.forEach(function(ring, ri){
       var first = true;
@@ -513,16 +683,16 @@ function drawPerimeters(){
       });
       ctx.closePath();
     });
-    ctx.fillStyle = 'rgba(255,110,30,' + alpha + ')';
+    ctx.fillStyle = sel ? MAPT.perimFillSel : MAPT.perimFill;
     ctx.fill();
-    ctx.strokeStyle = sel ? 'rgba(255,190,90,.95)' : 'rgba(255,140,50,.7)';
+    ctx.strokeStyle = sel ? MAPT.perimStrokeSel : MAPT.perimStroke;
     ctx.lineWidth = sel ? 2 : 1.1;
     ctx.stroke();
     if(sel){
       // pulse the selected perimeter
       var ph = (now/400) % (Math.PI*2);
       var glow = 0.3 + 0.3 * Math.sin(ph);
-      ctx.strokeStyle = 'rgba(255,180,60,' + glow + ')';
+      ctx.strokeStyle = 'rgba(' + MAPT.perimPulse + ',' + glow + ')';
       ctx.lineWidth = 5;
       ctx.stroke();
     }
@@ -558,7 +728,7 @@ function drawIncidents(){
       }
     } else {
       var g = ctx.createRadialGradient(s[0]-r*0.3, s[1]-r*0.3, r*0.2, s[0], s[1], r);
-      g.addColorStop(0, '#ffd24d'); g.addColorStop(0.45, '#ff8c1a'); g.addColorStop(1, '#d93a00');
+      g.addColorStop(0, MAPT.markerHi); g.addColorStop(0.45, MAPT.markerMid); g.addColorStop(1, MAPT.markerLo);
       ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, Math.PI*2);
       ctx.fillStyle = g; ctx.fill();
       if(sel){
@@ -573,14 +743,14 @@ function drawIncidents(){
       var label = inc.n;
       var tw = ctx.measureText(label).width;
       var ly = s[1] - r - 12;
-      ctx.fillStyle = 'rgba(10,12,17,.85)';
+      ctx.fillStyle = MAPT.labelBg;
       ctx.strokeStyle = 'rgba(255,107,26,.5)';
       ctx.lineWidth = 1;
       var bx = s[0] - tw/2 - 4, by = ly - 10;
       ctx.beginPath();
       ctx.roundRect ? ctx.roundRect(bx, by, tw+8, 17, 4) : ctx.rect(bx, by, tw+8, 17);
       ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#ffe9d6';
+      ctx.fillStyle = MAPT.labelText;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(label, s[0], by + 8.5);
     }
@@ -611,9 +781,9 @@ function drawCities(){
     var s = toScreen(c.lon, c.lat);
     if(s[0] < 0 || s[0] > W || s[1] < 0 || s[1] > H) return;
     ctx.beginPath(); ctx.arc(s[0], s[1], 1.8, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(150,160,185,.9)'; ctx.fill();
+    ctx.fillStyle = MAPT.city; ctx.fill();
     ctx.font = '600 9.5px sans-serif';
-    ctx.fillStyle = 'rgba(150,160,185,.75)';
+    ctx.fillStyle = MAPT.cityText;
     ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(c.n, s[0] + 4, s[1] - 2);
   });
@@ -633,7 +803,7 @@ function drawEmbers(){
     var a = 0.05 + 0.1 * ((Math.sin(seed + t * 2) + 1) / 2);
     ctx.beginPath();
     ctx.arc(px, py, 1.1 + (i % 3) * 0.5, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(255,140,60,' + a + ')';
+    ctx.fillStyle = 'rgba(' + MAPT.ember + ',' + a + ')';
     ctx.fill();
   }
 }
@@ -841,7 +1011,7 @@ function incDetailHTML(inc){
     row('Last report', fmtDate(inc.rep)) +
     row('Perimeter', p.length ? p.length + ' mapped' : 'not mapped') +
     '</div>' +
-    (inc.cont != null && inc.cont < 50 ? '<div style="margin:6px 0;font-size:11px;color:#ffd24d;">⚠ Actively spreading — not yet contained</div>' : '') +
+    (inc.cont != null && inc.cont < 50 ? '<div style="margin:6px 0;font-size:11px;color:var(--warn);">⚠ Actively spreading — not yet contained</div>' : '') +
     '<button class="dp-zoom">⛶ Zoom to fire</button>' +
     '</div>';
 }
@@ -1142,13 +1312,13 @@ function buildLegend(){
   var el = document.getElementById('legend');
   el.innerHTML =
     '<div class="lg-title">Legend</div>' +
-    '<div class="lg-row"><span class="sw" style="height:3px; background:#e4ecfa;"></span><span class="lbl">Oregon state boundary</span></div>' +
+    '<div class="lg-row"><span class="sw" style="height:3px; background:' + MAPT.outlineBorder + ';"></span><span class="lbl">Oregon state boundary</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#ff3b30;"></span><span class="lbl">containment &lt; 25%</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#ff8c1a;"></span><span class="lbl">25 – 50%</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#ffd24d;"></span><span class="lbl">50 – 90%</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#35e07f;"></span><span class="lbl">≥ 90%</span></div>' +
-    '<div class="lg-row"><i style="background:#ff7a2a;"></i><span class="lbl">fire perimeter</span></div>' +
-    '<div class="lg-row"><span class="sw" style="background:#7a2a05;"></span><span class="lbl">county burn heat</span></div>' +
+    '<div class="lg-row"><i style="background:' + MAPT.perimStroke + ';"></i><span class="lbl">fire perimeter</span></div>' +
+    '<div class="lg-row"><span class="sw" style="background:' + MAPT.burnB + ';"></span><span class="lbl">county burn heat</span></div>' +
     '<div class="lg-row"><span class="sw circle" style="background:#b45fd8;"></span><span class="lbl">AQI monitor (PM2.5)</span></div>';
 }
 
@@ -1157,6 +1327,10 @@ function boot(){
   resize();
   attachMapEvents();
   fitView();
+  // restore saved theme (applied before first paint so there's no flash)
+  var saved = 'ember';
+  try{ saved = localStorage.getItem('or-theme') || 'ember'; }catch(e){}
+  setTheme(saved);
   if(!D){
     document.getElementById('liveDot').className = 'dot err';
     document.getElementById('liveLabel').textContent = 'NO DATA';
@@ -1184,6 +1358,9 @@ function boot(){
   document.getElementById('btnFit').addEventListener('click', fitView);
   document.getElementById('btnFs').addEventListener('click', toggleFs);
   document.getElementById('btnFsExit').addEventListener('click', toggleFs);
+  document.querySelectorAll('.th').forEach(function(b){
+    b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme')); });
+  });
   function zoomBy(f, sx, sy){
     view.s = Math.min(400, Math.max(view.s*0.25, view.s*f));
     view.cx = toWorld(sx, sy)[0] - (sx - W/2)/view.s;

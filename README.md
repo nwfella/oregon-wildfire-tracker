@@ -9,6 +9,7 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 ## Features
 
 - **Hero map, top and center** — full-width canvas map of Oregon on page load; **⛶ maximizes it to full screen** (native Fullscreen API + CSS fallback, Esc/✕ to exit)
+- **5 color themes** — Ember (default), Forest green, Ocean blue, Magma sunset, and Daybreak (light) — one-tap switcher in the header, saved to your browser, and the map recolorizes to match (counties, state outline, labels, glow)
 - **Mobile-first** — 60vh touch map, pinch-zoom + drag pan, 40px tap targets, swipeable alert strip, responsive grid lists; everything below the fold stacks cleanly
 - **County burn-heat choropleth** — counties shaded by active fire acreage
 - **Active fires** — 97 incidents live from the NIFC/WFIGS feed: size, containment, cause,
