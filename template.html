@@ -123,14 +123,34 @@
   #legend{
     position:absolute; left:12px; bottom:12px; z-index:5; background:var(--overlay-bg);
     border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:11px; color:var(--muted);
-    max-width:240px; backdrop-filter:blur(4px);
+    max-width:250px; backdrop-filter:blur(4px);
   }
-  #legend .lg-title{font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text); font-size:10px; margin-bottom:6px;}
-  #legend .lg-row{display:flex; align-items:center; gap:8px; margin:3px 0;}
+  #legend.collapsed{display:none;}
+  #legend .lg-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  #legend .lg-title{font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text); font-size:10px; flex:1;}
+  #legend .lg-reset{font-size:9.5px; color:var(--accent2); cursor:pointer; letter-spacing:.5px; display:none; font-weight:700;}
+  #legend .lg-reset:hover{text-decoration:underline;}
+  #legend .lg-min{width:20px; height:20px; border-radius:6px; border:1px solid var(--border); background:none; color:var(--muted); font-size:14px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;}
+  #legend .lg-min:hover{color:var(--text); border-color:var(--accent);}
+  #legend .lg-row{display:flex; align-items:center; gap:8px; margin:1px -4px; padding:2px 4px; border-radius:6px; cursor:pointer; user-select:none; transition:opacity .15s, background .15s;}
+  #legend .lg-row:hover{background:var(--surface2);}
+  #legend .lg-row.off{opacity:.38;}
+  #legend .lg-row.off .sw, #legend .lg-row.off i{filter:grayscale(1);}
   #legend .sw{width:14px; height:14px; border-radius:4px; flex:none;}
   #legend .sw.circle{border-radius:50%;}
   #legend .lg-row i{display:inline-block; width:22px; height:8px; border-radius:4px;}
   #legend .lbl{flex:1;}
+  #legend .lg-key{display:flex; align-items:center; gap:6px; margin:1px 0 4px 18px; font-size:9.5px; color:var(--dim); letter-spacing:.3px; transition:opacity .15s;}
+  #legend .lg-key.off{opacity:.35;}
+  #legend .kdot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  #legendPill{
+    position:absolute; left:12px; bottom:12px; z-index:5; display:none; align-items:center; gap:7px;
+    background:var(--overlay-bg); border:1px solid var(--border); border-radius:10px; padding:7px 12px;
+    font-size:11px; color:var(--text); cursor:pointer; backdrop-filter:blur(4px);
+  }
+  #legendPill:hover{border-color:var(--accent);}
+  #legendPill .stack{display:flex; gap:2px;}
+  #legendPill .stack i{width:6px; height:14px; border-radius:2px; display:inline-block;}
   #mapHover{
     position:absolute; pointer-events:none; z-index:6; background:var(--overlay-bg);
     border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:12px;
@@ -265,7 +285,6 @@
   @media (max-width:560px){
     #stats{grid-template-columns:repeat(2,1fr);}
     .pill{font-size:11px;}
-    #legend{display:none;}
     header{padding:10px 14px;}
   }
   /* ---- theme picker ---- */
@@ -398,6 +417,7 @@
     </div>
     <div id="mapHint">drag to pan · scroll / pinch to zoom · tap a fire for details</div>
     <div id="legend"></div>
+    <div id="legendPill" title="Show legend"></div>
     <div id="mapHover"></div>
     <div id="detailPanel"></div>
   </div>
@@ -501,6 +521,14 @@ var hover = null, selected = null;   // incident ids or aqi indices
 var drag = null, pinch = null;
 var dirty = true;
 
+/* ---------- layer filters (legend toggles) ---------- */
+var LAYERS = { fires: true, perims: true, heat: true, aqi: true };
+try{
+  var lj = JSON.parse(localStorage.getItem('or-layers') || 'null');
+  if(lj) for(var lk in LAYERS){ if(typeof lj[lk] === 'boolean') LAYERS[lk] = lj[lk]; }
+}catch(e){}
+function saveLayers(){ try{ localStorage.setItem('or-layers', JSON.stringify(LAYERS)); }catch(e){} }
+
 /* ---------- build lookup ---------- */
 var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [];
 if(D){
@@ -600,13 +628,14 @@ function toWorld(sx, sy){
 
 /* ---------- drawing ---------- */
 function drawCounties(){
-  // choropleth by burning acres (county.b)
+  // choropleth by burning acres (county.b) — heat layer toggleable
+  var heat = LAYERS.heat;
   var maxB = 1;
   CNTY.forEach(function(c){ if(c.b > maxB) maxB = c.b; });
   CNTY.forEach(function(c){
-    var t = c.b > 0 ? (Math.log(c.b+1)/Math.log(maxB+1)) : 0;
+    var t = (heat && c.b > 0) ? (Math.log(c.b+1)/Math.log(maxB+1)) : 0;
     var col;
-    if(c.b <= 0) col = MAPT.county;
+    if(!heat || c.b <= 0) col = MAPT.county;
     else col = lerpColor(MAPT.burnA, MAPT.burnB, t);
     ctx.beginPath();
     c.p.forEach(function(ring, ri){
@@ -620,7 +649,7 @@ function drawCounties(){
     });
     ctx.fillStyle = col;
     ctx.fill();
-    ctx.strokeStyle = c.b > 0 ? MAPT.strokeBurn : MAPT.stroke;
+    ctx.strokeStyle = (heat && c.b > 0) ? MAPT.strokeBurn : MAPT.stroke;
     ctx.lineWidth = 1;
     ctx.stroke();
     // county label when zoomed
@@ -670,6 +699,7 @@ function drawStateOutline(){
   ctx.stroke();
 }
 function drawPerimeters(){
+  if(!LAYERS.perims) return;
   var now = Date.now();
   PERIM.forEach(function(p){
     var sel = selected && selected.type === 'inc' && p.n === INC[selected.id].n;
@@ -699,6 +729,7 @@ function drawPerimeters(){
   });
 }
 function drawIncidents(){
+  if(!LAYERS.fires) return;
   INC.forEach(function(inc, idx){
     if(!inc.lat || !inc.lon) return;
     var s = toScreen(inc.lon, inc.lat);
@@ -757,6 +788,7 @@ function drawIncidents(){
   });
 }
 function drawAQI(){
+  if(!LAYERS.aqi) return;
   AQI.forEach(function(a, idx){
     if(!a.lat || !a.lon) return;
     var s = toScreen(a.lon, a.lat);
@@ -790,7 +822,7 @@ function drawCities(){
 }
 function drawEmbers(){
   // subtle drifting embers — pure decoration
-  if(!D) return;
+  if(!D || !LAYERS.fires) return;
   var t = Date.now() / 1000;
   for(var i = 0; i < 26; i++){
     var seed = i * 137.508;
@@ -811,8 +843,8 @@ function drawHover(){
   hover = null;
   if(!D) return;
   var w = toWorld(mouse.sx, mouse.sy);
-  // incidents first
-  for(var i = INC.length - 1; i >= 0; i--){
+  // incidents first (only when the fires layer is on)
+  if(LAYERS.fires) for(var i = INC.length - 1; i >= 0; i--){
     var inc = INC[i];
     if(!inc.lat || !inc.lon) continue;
     var s = toScreen(inc.lon, inc.lat);
@@ -820,7 +852,7 @@ function drawHover(){
     var dx = s[0] - mouse.sx, dy = s[1] - mouse.sy;
     if(dx*dx + dy*dy < r*r){ hover = {type:'inc', id:i, name:inc.n, sub:inc.cnty + ' · ' + fmtAcres(inc.acres) + ' ac · ' + contLabel(inc.cont) + ' contained'}; break; }
   }
-  if(!hover){
+  if(!hover && LAYERS.aqi){
     for(var j = 0; j < AQI.length; j++){
       var a = AQI[j];
       if(!a.lat || !a.lon) continue;
@@ -972,7 +1004,7 @@ canvas.addEventListener('dblclick', function(e){
 
 function handleClick(sx, sy){
   var w = toWorld(sx, sy);
-  for(var i = INC.length - 1; i >= 0; i--){
+  if(LAYERS.fires) for(var i = INC.length - 1; i >= 0; i--){
     var inc = INC[i];
     if(!inc.lat || !inc.lon) continue;
     var s = toScreen(inc.lon, inc.lat);
@@ -980,7 +1012,7 @@ function handleClick(sx, sy){
     var dx = s[0] - sx, dy = s[1] - sy;
     if(dx*dx + dy*dy < r*r){ selectIncident(i); return; }
   }
-  for(var j = 0; j < AQI.length; j++){
+  if(LAYERS.aqi) for(var j = 0; j < AQI.length; j++){
     var a = AQI[j];
     if(!a.lat || !a.lon) continue;
     var s2 = toScreen(a.lon, a.lat);
@@ -1307,19 +1339,67 @@ document.querySelectorAll('.tab').forEach(function(t){
   t.addEventListener('click', function(){ switchTab(t.getAttribute('data-tab')); });
 });
 
-/* ---------- legend ---------- */
+/* ---------- legend: layer filters + collapse ---------- */
+var LEG_COLLAPSED = null;   // null = auto default (collapsed on small screens)
+function toggleLayer(k){
+  LAYERS[k] = !LAYERS[k];
+  saveLayers();
+  // if the selected item's layer just got hidden, drop the selection too
+  if(!LAYERS[k] && selected){
+    if((k === 'fires' && selected.type === 'inc') || (k === 'aqi' && selected.type === 'aqi')) closeDetail();
+  }
+  buildLegend();
+  updateLegendUI();
+  dirty = true;
+}
+function setLegendCollapsed(c){
+  LEG_COLLAPSED = c ? true : false;
+  try{ localStorage.setItem('or-legend', LEG_COLLAPSED ? '1' : '0'); }catch(e){}
+  updateLegendUI();
+}
+function updateLegendUI(){
+  var leg = document.getElementById('legend');
+  var pill = document.getElementById('legendPill');
+  if(!leg || !pill) return;
+  if(LEG_COLLAPSED){
+    leg.classList.add('collapsed');
+    var anyOff = !LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi;
+    pill.innerHTML = '<span class="stack"><i style="background:#ff3b30;"></i><i style="background:#ff8c1a;"></i><i style="background:#35e07f;"></i></span>' +
+      '<span>Legend</span>' + (anyOff ? '<span style="color:var(--accent2);font-weight:700;">· filtered</span>' : '');
+    pill.style.display = 'flex';
+  } else {
+    leg.classList.remove('collapsed');
+    pill.style.display = 'none';
+  }
+}
 function buildLegend(){
   var el = document.getElementById('legend');
+  var anyOff = !LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi;
   el.innerHTML =
-    '<div class="lg-title">Legend</div>' +
-    '<div class="lg-row"><span class="sw" style="height:3px; background:' + MAPT.outlineBorder + ';"></span><span class="lbl">Oregon state boundary</span></div>' +
-    '<div class="lg-row"><span class="sw circle" style="background:#ff3b30;"></span><span class="lbl">containment &lt; 25%</span></div>' +
-    '<div class="lg-row"><span class="sw circle" style="background:#ff8c1a;"></span><span class="lbl">25 – 50%</span></div>' +
-    '<div class="lg-row"><span class="sw circle" style="background:#ffd24d;"></span><span class="lbl">50 – 90%</span></div>' +
-    '<div class="lg-row"><span class="sw circle" style="background:#35e07f;"></span><span class="lbl">≥ 90%</span></div>' +
-    '<div class="lg-row"><i style="background:' + MAPT.perimStroke + ';"></i><span class="lbl">fire perimeter</span></div>' +
-    '<div class="lg-row"><span class="sw" style="background:' + MAPT.burnB + ';"></span><span class="lbl">county burn heat</span></div>' +
-    '<div class="lg-row"><span class="sw circle" style="background:#b45fd8;"></span><span class="lbl">AQI monitor (PM2.5)</span></div>';
+    '<div class="lg-head"><span class="lg-title">Legend — tap to filter</span>' +
+    (anyOff ? '<span class="lg-reset" id="lgReset">show all</span>' : '') +
+    '<button class="lg-min" id="lgMin" title="Collapse legend">−</button></div>' +
+    '<div class="lg-row' + (LAYERS.fires ? '' : ' off') + '" data-layer="fires" title="Toggle active fires">' +
+    '<span class="sw circle" style="background:radial-gradient(circle at 35% 35%,' + MAPT.markerHi + ',' + MAPT.markerMid + ' 55%,' + MAPT.markerLo + ');"></span>' +
+    '<span class="lbl">Active fires</span></div>' +
+    '<div class="lg-key' + (LAYERS.fires ? '' : ' off') + '">' +
+    '<span class="kdot" style="background:#ff3b30;"></span>&lt;25%&nbsp;' +
+    '<span class="kdot" style="background:#ff8c1a;"></span>25–50%&nbsp;' +
+    '<span class="kdot" style="background:#ffd24d;"></span>50–90%&nbsp;' +
+    '<span class="kdot" style="background:#35e07f;"></span>≥90% contained</div>' +
+    '<div class="lg-row' + (LAYERS.perims ? '' : ' off') + '" data-layer="perims" title="Toggle fire perimeters">' +
+    '<i style="background:' + MAPT.perimStroke + ';"></i><span class="lbl">Fire perimeters</span></div>' +
+    '<div class="lg-row' + (LAYERS.heat ? '' : ' off') + '" data-layer="heat" title="Toggle county burn heat">' +
+    '<span class="sw" style="background:linear-gradient(90deg,' + MAPT.burnA + ',' + MAPT.burnB + ');"></span>' +
+    '<span class="lbl">County burn heat</span></div>' +
+    '<div class="lg-row' + (LAYERS.aqi ? '' : ' off') + '" data-layer="aqi" title="Toggle AQI monitors">' +
+    '<span class="sw circle" style="background:#b45fd8;"></span><span class="lbl">AQI monitors (PM2.5)</span></div>' +
+    '<div class="lg-row" title="Reference — always drawn">' +
+    '<span class="sw" style="height:3px; background:' + MAPT.outlineBorder + ';"></span><span class="lbl">Oregon state boundary</span></div>';
+  var min = el.querySelector('#lgMin');
+  if(min) min.onclick = function(){ setLegendCollapsed(true); };
+  var res = el.querySelector('#lgReset');
+  if(res) res.onclick = function(){ for(var k in LAYERS) LAYERS[k] = true; saveLayers(); buildLegend(); updateLegendUI(); dirty = true; };
 }
 
 /* ---------- boot ---------- */
@@ -1331,6 +1411,11 @@ function boot(){
   var saved = 'ember';
   try{ saved = localStorage.getItem('or-theme') || 'ember'; }catch(e){}
   setTheme(saved);
+  // legend: collapsed by default on small screens, else restore preference
+  var savedLeg = null;
+  try{ savedLeg = localStorage.getItem('or-legend'); }catch(e){}
+  LEG_COLLAPSED = (window.innerWidth <= 560) ? true : (savedLeg === '1');
+  updateLegendUI();
   if(!D){
     document.getElementById('liveDot').className = 'dot err';
     document.getElementById('liveLabel').textContent = 'NO DATA';
@@ -1361,6 +1446,12 @@ function boot(){
   document.querySelectorAll('.th').forEach(function(b){
     b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme')); });
   });
+  // legend row toggles (delegated — rows are rebuilt on every toggle)
+  document.getElementById('legend').addEventListener('click', function(e){
+    var row = e.target && e.target.closest ? e.target.closest('.lg-row[data-layer]') : null;
+    if(row) toggleLayer(row.getAttribute('data-layer'));
+  });
+  document.getElementById('legendPill').addEventListener('click', function(){ setLegendCollapsed(false); });
   function zoomBy(f, sx, sy){
     view.s = Math.min(400, Math.max(view.s*0.25, view.s*f));
     view.cx = toWorld(sx, sy)[0] - (sx - W/2)/view.s;

@@ -9,7 +9,9 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 ## Features
 
 - **Hero map, top and center** — full-width canvas map of Oregon on page load; **⛶ maximizes it to full screen** (native Fullscreen API + CSS fallback, Esc/✕ to exit)
-- **5 color themes** — Ember (default), Forest green, Ocean blue, Magma sunset, and Daybreak (light) — one-tap switcher in the header, saved to your browser, and the map recolorizes to match (counties, state outline, labels, glow)
+- **5 color themes** — Ember (default), Forest, Ocean, Magma, Daybreak; theme picker in the header, saved to localStorage, the canvas map recolorizes to match
+- **Legend = layer filters** — tap any legend row (active fires, perimeters, county burn heat, AQI monitors) to hide/show that layer on the map; multi-select; "show all" reset; choices remembered
+- **Collapsible legend** — the **−** button minimizes it to a small "Legend" pill (tap to bring it back; auto-collapsed on phones, where it used to be hidden entirely)
 - **Mobile-first** — 60vh touch map, pinch-zoom + drag pan, 40px tap targets, swipeable alert strip, responsive grid lists; everything below the fold stacks cleanly
 - **County burn-heat choropleth** — counties shaded by active fire acreage
 - **Active fires** — 97 incidents live from the NIFC/WFIGS feed: size, containment, cause,
