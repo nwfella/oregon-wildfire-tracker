@@ -140,9 +140,12 @@
   #legend .sw.circle{border-radius:50%;}
   #legend .lg-row i{display:inline-block; width:22px; height:8px; border-radius:4px;}
   #legend .lbl{flex:1;}
-  #legend .lg-key{display:flex; align-items:center; gap:6px; margin:1px 0 4px 18px; font-size:9.5px; color:var(--dim); letter-spacing:.3px; transition:opacity .15s;}
-  #legend .lg-key.off{opacity:.35;}
-  #legend .kdot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  #legend .lg-keys{display:grid; grid-template-columns:1fr 1fr; gap:0 6px; margin:0 0 4px 14px; transition:opacity .15s;}
+  #legend .lg-keys.off{opacity:.4;}
+  #legend .lg-keys .lg-chip{margin:0; padding:1px 3px; font-size:9.5px; color:var(--dim); letter-spacing:.3px; gap:5px;}
+  #legend .lg-keys .lg-chip .kdot{width:8px; height:8px; border-radius:50%; display:inline-block; flex:none;}
+  #legend .lg-keys .lg-chip:hover{color:var(--text);}
+  #legend .lg-cap{grid-column:1 / -1; font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase; color:var(--dim); margin-top:1px; padding-left:3px;}
   #legendPill{
     position:absolute; left:12px; bottom:12px; z-index:5; display:none; align-items:center; gap:7px;
     background:var(--overlay-bg); border:1px solid var(--border); border-radius:10px; padding:7px 12px;
@@ -522,12 +525,28 @@ var drag = null, pinch = null;
 var dirty = true;
 
 /* ---------- layer filters (legend toggles) ---------- */
-var LAYERS = { fires: true, perims: true, heat: true, aqi: true };
+var LAYERS = { fires: true, perims: true, heat: true, aqi: true,
+  cont: { lt25: true, b2550: true, b5090: true, gte90: true } };
 try{
   var lj = JSON.parse(localStorage.getItem('or-layers') || 'null');
-  if(lj) for(var lk in LAYERS){ if(typeof lj[lk] === 'boolean') LAYERS[lk] = lj[lk]; }
+  if(lj) for(var lk in LAYERS){
+    if(lk === 'cont'){ if(lj.cont && typeof lj.cont === 'object') for(var cb in LAYERS.cont){ if(typeof lj.cont[cb] === 'boolean') LAYERS.cont[cb] = lj.cont[cb]; } }
+    else if(typeof lj[lk] === 'boolean') LAYERS[lk] = lj[lk];
+  }
 }catch(e){}
 function saveLayers(){ try{ localStorage.setItem('or-layers', JSON.stringify(LAYERS)); }catch(e){} }
+function contBucket(c){
+  if(c == null) return 'na';
+  if(c < 25) return 'lt25';
+  if(c < 50) return 'b2550';
+  if(c < 90) return 'b5090';
+  return 'gte90';
+}
+function anyLayerOff(){
+  if(!LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi) return true;
+  for(var cb in LAYERS.cont){ if(!LAYERS.cont[cb]) return true; }
+  return false;
+}
 
 /* ---------- build lookup ---------- */
 var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [];
@@ -732,6 +751,7 @@ function drawIncidents(){
   if(!LAYERS.fires) return;
   INC.forEach(function(inc, idx){
     if(!inc.lat || !inc.lon) return;
+    if(inc.cont != null && !LAYERS.cont[contBucket(inc.cont)]) return;
     var s = toScreen(inc.lon, inc.lat);
     if(s[0] < -60 || s[0] > W+60 || s[1] < -60 || s[1] > H+60) return;
     var r = 5 + 12 * Math.pow(inc.acres / maxAcres, 0.35);
@@ -847,6 +867,7 @@ function drawHover(){
   if(LAYERS.fires) for(var i = INC.length - 1; i >= 0; i--){
     var inc = INC[i];
     if(!inc.lat || !inc.lon) continue;
+    if(inc.cont != null && !LAYERS.cont[contBucket(inc.cont)]) continue;
     var s = toScreen(inc.lon, inc.lat);
     var r = 5 + 12 * Math.pow(inc.acres / maxAcres, 0.35) + 6;
     var dx = s[0] - mouse.sx, dy = s[1] - mouse.sy;
@@ -1007,6 +1028,7 @@ function handleClick(sx, sy){
   if(LAYERS.fires) for(var i = INC.length - 1; i >= 0; i--){
     var inc = INC[i];
     if(!inc.lat || !inc.lon) continue;
+    if(inc.cont != null && !LAYERS.cont[contBucket(inc.cont)]) continue;
     var s = toScreen(inc.lon, inc.lat);
     var r = 5 + 12 * Math.pow(inc.acres / maxAcres, 0.35) + 8;
     var dx = s[0] - sx, dy = s[1] - sy;
@@ -1342,12 +1364,22 @@ document.querySelectorAll('.tab').forEach(function(t){
 /* ---------- legend: layer filters + collapse ---------- */
 var LEG_COLLAPSED = null;   // null = auto default (collapsed on small screens)
 function toggleLayer(k){
-  LAYERS[k] = !LAYERS[k];
-  saveLayers();
-  // if the selected item's layer just got hidden, drop the selection too
-  if(!LAYERS[k] && selected){
-    if((k === 'fires' && selected.type === 'inc') || (k === 'aqi' && selected.type === 'aqi')) closeDetail();
+  if(k.indexOf('cont:') === 0){
+    var cb = k.slice(5);
+    LAYERS.cont[cb] = !LAYERS.cont[cb];
+    if(!LAYERS.fires) LAYERS.fires = true;   // chip click implies "show me fires"
+    if(!LAYERS.cont[cb] && selected && selected.type === 'inc'){
+      var inc = INC[selected.id];
+      if(inc && contBucket(inc.cont) === cb) closeDetail();
+    }
+  } else {
+    LAYERS[k] = !LAYERS[k];
+    // if the selected item's layer just got hidden, drop the selection too
+    if(!LAYERS[k] && selected){
+      if((k === 'fires' && selected.type === 'inc') || (k === 'aqi' && selected.type === 'aqi')) closeDetail();
+    }
   }
+  saveLayers();
   buildLegend();
   updateLegendUI();
   dirty = true;
@@ -1363,7 +1395,7 @@ function updateLegendUI(){
   if(!leg || !pill) return;
   if(LEG_COLLAPSED){
     leg.classList.add('collapsed');
-    var anyOff = !LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi;
+    var anyOff = anyLayerOff();
     pill.innerHTML = '<span class="stack"><i style="background:#ff3b30;"></i><i style="background:#ff8c1a;"></i><i style="background:#35e07f;"></i></span>' +
       '<span>Legend</span>' + (anyOff ? '<span style="color:var(--accent2);font-weight:700;">· filtered</span>' : '');
     pill.style.display = 'flex';
@@ -1374,7 +1406,7 @@ function updateLegendUI(){
 }
 function buildLegend(){
   var el = document.getElementById('legend');
-  var anyOff = !LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi;
+  var anyOff = anyLayerOff();
   el.innerHTML =
     '<div class="lg-head"><span class="lg-title">Legend — tap to filter</span>' +
     (anyOff ? '<span class="lg-reset" id="lgReset">show all</span>' : '') +
@@ -1382,11 +1414,12 @@ function buildLegend(){
     '<div class="lg-row' + (LAYERS.fires ? '' : ' off') + '" data-layer="fires" title="Toggle active fires">' +
     '<span class="sw circle" style="background:radial-gradient(circle at 35% 35%,' + MAPT.markerHi + ',' + MAPT.markerMid + ' 55%,' + MAPT.markerLo + ');"></span>' +
     '<span class="lbl">Active fires</span></div>' +
-    '<div class="lg-key' + (LAYERS.fires ? '' : ' off') + '">' +
-    '<span class="kdot" style="background:#ff3b30;"></span>&lt;25%&nbsp;' +
-    '<span class="kdot" style="background:#ff8c1a;"></span>25–50%&nbsp;' +
-    '<span class="kdot" style="background:#ffd24d;"></span>50–90%&nbsp;' +
-    '<span class="kdot" style="background:#35e07f;"></span>≥90% contained</div>' +
+    '<div class="lg-keys' + (LAYERS.fires ? '' : ' off') + '">' +
+    '<div class="lg-row lg-chip' + (LAYERS.cont.lt25 ? '' : ' off') + '" data-layer="cont:lt25" title="Toggle fires under 25% contained"><span class="kdot" style="background:#ff3b30;"></span>&lt;25%</div>' +
+    '<div class="lg-row lg-chip' + (LAYERS.cont.b2550 ? '' : ' off') + '" data-layer="cont:b2550" title="Toggle fires 25–50% contained"><span class="kdot" style="background:#ff8c1a;"></span>25–50%</div>' +
+    '<div class="lg-row lg-chip' + (LAYERS.cont.b5090 ? '' : ' off') + '" data-layer="cont:b5090" title="Toggle fires 50–90% contained"><span class="kdot" style="background:#ffd24d;"></span>50–90%</div>' +
+    '<div class="lg-row lg-chip' + (LAYERS.cont.gte90 ? '' : ' off') + '" data-layer="cont:gte90" title="Toggle fires 90%+ contained"><span class="kdot" style="background:#35e07f;"></span>≥90%</div>' +
+    '<span class="lg-cap">containment</span></div>' +
     '<div class="lg-row' + (LAYERS.perims ? '' : ' off') + '" data-layer="perims" title="Toggle fire perimeters">' +
     '<i style="background:' + MAPT.perimStroke + ';"></i><span class="lbl">Fire perimeters</span></div>' +
     '<div class="lg-row' + (LAYERS.heat ? '' : ' off') + '" data-layer="heat" title="Toggle county burn heat">' +
@@ -1399,7 +1432,10 @@ function buildLegend(){
   var min = el.querySelector('#lgMin');
   if(min) min.onclick = function(){ setLegendCollapsed(true); };
   var res = el.querySelector('#lgReset');
-  if(res) res.onclick = function(){ for(var k in LAYERS) LAYERS[k] = true; saveLayers(); buildLegend(); updateLegendUI(); dirty = true; };
+  if(res) res.onclick = function(){
+    for(var k in LAYERS){ if(k === 'cont'){ for(var cb in LAYERS.cont) LAYERS.cont[cb] = true; } else LAYERS[k] = true; }
+    saveLayers(); buildLegend(); updateLegendUI(); dirty = true;
+  };
 }
 
 /* ---------- boot ---------- */
