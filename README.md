@@ -20,7 +20,8 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 - **Daily perimeters** — orange fire boundaries, pulse-highlighted when a fire is selected
 - **Evacuation zones** — Genasys Protect GO/SET/READY/order polygons overlaid on the map
   (pulse-highlighted at GO/order), level counts in the legend, and a warning banner when
-  any zone is at GO NOW / evacuation order
+  any zone is at GO NOW / evacuation order; the **EVAC tab** lists active zones grouped by
+  county (GO first) — tap a row or a map polygon for details, zoom in for on-map status labels
 - **Air quality** — PM2.5 readings from 100+ Oregon monitors (OpenAQ mirror), EPA AQI +
   category colors, worst-first ranking
 - **NWS alerts** — red flag warnings, fire weather watches, evacuations, air quality alerts,

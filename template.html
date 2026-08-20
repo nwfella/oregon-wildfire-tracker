@@ -232,7 +232,7 @@
     background:var(--bg); color:var(--text); font-size:13px; outline:none;
   }
   #fireSearch:focus{border-color:var(--accent);}
-  #fireList,#airList,#alertList,#smokeList{overflow-y:auto; flex:1; padding:6px 8px 12px;}
+  #fireList,#airList,#alertList,#evacList,#smokeList{overflow-y:auto; flex:1; padding:6px 8px 12px;}
   .f-item{
     border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:7px;
     cursor:pointer; background:var(--surface2); transition:border-color .15s, transform .1s;
@@ -249,6 +249,20 @@
   .f-cont{font-size:11px; font-weight:700; color:var(--muted); flex:none; font-variant-numeric:tabular-nums;}
   .f-meta{font-size:10px; color:var(--dim); margin-top:5px; display:flex; gap:10px;}
   .f-meta .dot2{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:4px; vertical-align:1px;}
+  .evac-grp{margin:8px 0 4px; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:8px;}
+  .evac-grp:first-child{margin-top:2px;}
+  .evac-grp .gbar{flex:1; height:2px; background:var(--border); border-radius:1px;}
+  .e-item{display:flex; align-items:center; gap:10px; padding:8px 11px; border:1px solid var(--border); border-radius:10px; margin-bottom:6px; cursor:pointer; background:var(--surface2); transition:border-color .15s;}
+  .e-item:hover{border-color:var(--accent2);}
+  .e-item.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .e-dot{width:10px; height:10px; border-radius:50%; flex:none; box-shadow:0 0 6px currentColor;}
+  .e-body{flex:1; min-width:0;}
+  .e-name{font-weight:700; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .e-name .dim{color:var(--muted); font-weight:600;}
+  .e-cnty{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:1px;}
+  .e-lv{font-size:10px; font-weight:800; letter-spacing:.8px; flex:none; padding:3px 7px; border-radius:99px; border:1px solid;}
+  .evac-foot{font-size:10px; color:var(--dim); padding:4px 8px 10px;}
+  .evac-foot a{color:var(--accent2); text-decoration:none;}
   .aq-item{display:flex; align-items:center; gap:10px; padding:8px 11px; border:1px solid var(--border); border-radius:10px; margin-bottom:6px; cursor:pointer; background:var(--surface2);}
   .aq-item:hover{border-color:var(--accent2);}
   .aq-badge{width:44px; height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#101418; flex:none;}
@@ -445,6 +459,7 @@
       <div class="tab active" data-tab="fires">FIRES<span class="cnt" id="cntFires"></span></div>
       <div class="tab" data-tab="air">AIR<span class="cnt" id="cntAir"></span></div>
       <div class="tab" data-tab="alerts">ALERTS<span class="cnt" id="cntAlerts"></span></div>
+      <div class="tab" data-tab="evac">EVAC<span class="cnt" id="cntEvac"></span></div>
       <div class="tab" data-tab="smoke">SMOKE</div>
     </div>
     <div id="tab-fires" class="tabpane">
@@ -453,6 +468,10 @@
     </div>
     <div id="tab-air" class="tabpane hidden"><div id="airList"></div></div>
     <div id="tab-alerts" class="tabpane hidden"><div id="alertList"></div></div>
+    <div id="tab-evac" class="tabpane hidden">
+      <div id="evacList"></div>
+      <div class="evac-foot">Zone polygons + status courtesy of <a href="https://protect.genasys.com/" target="_blank" rel="noopener">Genasys Protect</a>. Verify with local officials.</div>
+    </div>
     <div id="tab-smoke" class="tabpane hidden"><div id="smokeList"></div></div>
   </aside>
 
@@ -761,6 +780,22 @@ function drawEvacZones(){
       ctx.strokeStyle = 'rgba(255,59,48,' + (0.22 + 0.22*Math.sin(ph)) + ')';
       ctx.lineWidth = 4;
       ctx.stroke();
+    }
+    if(view.s > 2600){
+      // status label at the zone centroid when zoomed in
+      var cx2 = 0, cy2 = 0, npts = 0;
+      z.p.forEach(function(ring){ ring.forEach(function(pt){ var s2 = toScreen(pt[0], pt[1]); cx2 += s2[0]; cy2 += s2[1]; npts++; }); });
+      if(npts){
+        cx2 /= npts; cy2 /= npts;
+        var lbl = EVAC_LV_LABEL[z.lv] || 'ACTIVE';
+        ctx.font = '800 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,.65)';
+        ctx.strokeText(lbl, cx2, cy2);
+        ctx.fillStyle = EVAC_COLORS[z.lv] || EVAC_COLORS[0];
+        ctx.fillText(lbl, cx2, cy2);
+      }
     }
   });
 }
@@ -1089,6 +1124,22 @@ function handleClick(sx, sy){
     var dx2 = s2[0] - sx, dy2 = s2[1] - sy;
     if(dx2*dx2 + dy2*dy2 < 100){ selectAqi(j); return; }
   }
+  // evacuation zones last — big polygons, so markers win on top
+  if(LAYERS.evac) for(var k = 0; k < EVAC.length; k++){
+    var z = EVAC[k], hit = false;
+    z.p.forEach(function(ring){
+      if(hit) return;
+      var n = ring.length, jj = n - 1, inside = false;
+      for(var i2 = 0; i2 < n; i2++){
+        var xi = ring[i2][0], yi = ring[i2][1];
+        var xj = ring[jj][0], yj = ring[jj][1];
+        if(((yi > w[1]) !== (yj > w[1])) && (w[0] < (xj - xi) * (w[1] - yi) / (yj - yi) + xi)) inside = !inside;
+        jj = i2;
+      }
+      if(inside) hit = true;
+    });
+    if(hit){ selectEvac(k); return; }
+  }
   closeDetail();
 }
 
@@ -1175,6 +1226,7 @@ function closeDetail(){
   document.getElementById('detailPanel').style.display = 'none';
   buildFires();
   buildAir();
+  buildEvac();
   dirty = true;
 }
 window.__orClose = closeDetail;
@@ -1194,6 +1246,11 @@ function positionPopup(){
     if(!a || !a.lat || !a.lon) return;
     var s2 = toScreen(a.lon, a.lat);
     sx = s2[0]; sy = s2[1];
+  } else if(selected.type === 'evac'){
+    var z = EVAC[selected.id];
+    if(!z || z.lat == null || z.lon == null) return;
+    var s3 = toScreen(z.lon, z.lat);
+    sx = s3[0]; sy = s3[1];
   } else return;
   // marker off-screen → hide popup until it comes back into view
   if(sx < -60 || sx > W + 60 || sy < -60 || sy > H + 60){
@@ -1372,6 +1429,94 @@ function buildAlertBar(){
   }).join('');
 }
 
+/* ---------- evac list + detail ---------- */
+var EVAC_LV_LABEL = { 4:'ORDER', 3:'GO NOW', 2:'BE SET', 1:'BE READY', 0:'ACTIVE' };
+function evacZoneName(z){
+  return (z.n && z.n !== 'Evacuation zone') ? z.n : null;
+}
+function buildEvac(){
+  var el = document.getElementById('evacList');
+  if(!el) return;
+  if(!EVAC.length){ el.innerHTML = '<div class="empty">No active evacuation zones right now.</div>'; return; }
+  // group by county, sort groups by their worst level (GO/order first)
+  var groups = {};
+  EVAC.forEach(function(z, i){ var key = z.cnty || 'Unknown area'; (groups[key] = groups[key] || []).push({ z: z, i: i }); });
+  var order = Object.keys(groups).sort(function(a, b){
+    var ma = Math.max.apply(null, groups[a].map(function(x){ return x.z.lv; }));
+    var mb = Math.max.apply(null, groups[b].map(function(x){ return x.z.lv; }));
+    if(ma !== mb) return mb - ma;
+    return a.localeCompare(b);
+  });
+  el.innerHTML = order.map(function(cnt){
+    var items = groups[cnt].sort(function(a, b){ return b.z.lv - a.z.lv; });
+    var worst = Math.max.apply(null, items.map(function(x){ return x.z.lv; }));
+    var col = EVAC_COLORS[worst] || EVAC_COLORS[0];
+    var html = '<div class="evac-grp"><span style="color:' + col + ';">' + esc(cnt) + '</span>' +
+      '<span>' + items.length + ' zone' + (items.length === 1 ? '' : 's') + '</span><span class="gbar"></span></div>';
+    return html + items.map(function(x){
+      var sel = selected && selected.type === 'evac' && selected.id === x.i;
+      var name = evacZoneName(x.z);
+      var zcol = EVAC_COLORS[x.z.lv] || EVAC_COLORS[0];
+      return '<div class="e-item' + (sel ? ' sel' : '') + '" data-eidx="' + x.i + '">' +
+        '<span class="e-dot" style="background:' + zcol + ';color:' + zcol + ';"></span>' +
+        '<span class="e-body"><span class="e-name">' + (name ? esc(name) : '<span class="dim">Zone in ' + esc(cnt) + '</span>') + '</span>' +
+        '<span class="e-cnty">' + esc(x.z.st) + '</span></span>' +
+        '<span class="e-lv" style="color:' + zcol + ';border-color:' + zcol + '55;">' + (EVAC_LV_LABEL[x.z.lv] || 'ACTIVE') + '</span>' +
+        '</div>';
+    }).join('');
+  }).join('');
+  el.querySelectorAll('.e-item').forEach(function(row){
+    row.addEventListener('click', function(){ selectEvac(parseInt(row.getAttribute('data-eidx'), 10), true); });
+  });
+}
+function evacDetailHTML(z){
+  var name = evacZoneName(z);
+  return '<div class="dp-head"><div><div class="dp-name">🚨 ' + (name ? esc(name) : esc(z.cnty || 'Evacuation zone')) + '</div>' +
+    '<div class="dp-cnty">' + esc(z.cnty || '—') + ' County, Oregon</div></div>' +
+    '<button class="dp-close" onclick="window.__orClose && window.__orClose()">✕</button></div>' +
+    '<div class="dp-body">' +
+    '<div class="dp-big"><span class="dp-acres" style="color:' + (EVAC_COLORS[z.lv] || EVAC_COLORS[0]) + ';">' + (EVAC_LV_LABEL[z.lv] || 'ACTIVE') + '</span>' +
+    '<span class="dp-cont">' + esc(z.st) + '</span></div>' +
+    '<div class="dp-grid">' +
+    row('County', z.cnty || '—') +
+    row('Zone ID', z.id || '—') +
+    row('Source', 'Genasys Protect') +
+    '</div>' +
+    '<div style="margin:6px 0;font-size:11px;color:var(--warn);">⚠ Evacuation status changes quickly — verify with local officials.</div>' +
+    '<a class="dp-zoom" style="display:block;text-align:center;text-decoration:none;color:var(--accent2);" href="https://protect.genasys.com/" target="_blank" rel="noopener">Check Genasys Protect →</a>' +
+    '<button class="dp-zoom" id="zoneZoom">⛶ Zoom to zone</button>' +
+    '</div>';
+}
+function attachZoneZoom(root, z){
+  var zb = document.getElementById('zoneZoom');
+  if(!zb) return;
+  zb.onclick = function(){
+    view.s = Math.min(400, Math.max(view.s, Math.min(W, H) * 0.22));
+    if(z.lat != null && z.lon != null){
+      view.cx = (z.lon - LON0) * COSL * K;
+      view.cy = (LAT1 - z.lat) * K;
+    }
+    dirty = true;
+    var wrap = document.getElementById('mapWrap');
+    if(wrap.scrollIntoView) wrap.scrollIntoView({behavior:'smooth', block:'center'});
+  };
+}
+function selectEvac(i, fromList){
+  if(!EVAC[i]) return;
+  selected = { type: 'evac', id: i };
+  var panel = document.getElementById('detailPanel');
+  panel.innerHTML = evacDetailHTML(EVAC[i]);
+  panel.style.display = 'block';
+  positionPopup();
+  attachZoneZoom(panel, EVAC[i]);
+  buildEvac();
+  if(fromList){
+    var row = document.querySelector('#evacList .e-item[data-eidx="' + i + '"]');
+    if(row && row.scrollIntoView) row.scrollIntoView({block:'nearest'});
+  }
+  dirty = true;
+}
+
 /* ---------- evac banner ---------- */
 function buildEvacBanner(){
   var el = document.getElementById('evacBanner');
@@ -1390,6 +1535,7 @@ function buildEvacBanner(){
 function buildStats(){
   var el = document.getElementById('stats');
   var s = (D && D.stats) || {};
+  var ev = s.evac || null;
   var totAcres = s.acres || 0;
   var items = [
     { k: 'Active fires', v: (s.fires || 0) + '', sub: 'in Oregon', bar: Math.min(100, (s.fires || 0) * 4), c: 'var(--accent)' },
@@ -1398,6 +1544,7 @@ function buildStats(){
     { k: 'Personnel', v: (s.per || 0) + '', sub: 'assigned', bar: Math.min(100, (s.per || 0) / 60), c: 'var(--yellow)' },
     { k: 'New · 24h', v: (s.new24 || 0) + '', sub: 'discovered', bar: Math.min(100, (s.new24 || 0) * 30), c: 'var(--red)' },
     { k: 'Red flags', v: (s.redFlags || 0) + '', sub: 'NWS warnings', bar: Math.min(100, (s.redFlags || 0) * 33), c: '#ff8c1a' },
+    { k: 'Evac GO', v: (ev ? (ev.go + ev.order) : 0) + '', sub: ev ? (ev.set + ' set · ' + ev.ready + ' ready') : 'no active zones', bar: ev ? Math.min(100, (ev.go + ev.order) * 2) : 0, c: '#ff3b30' },
   ];
   el.innerHTML = items.map(function(it){
     return '<div class="stat"><div class="k">' + it.k + '</div><div class="v" style="color:' + it.c + '">' + it.v + '</div>' +
@@ -1406,17 +1553,19 @@ function buildStats(){
   document.getElementById('cntFires').textContent = (s.fires || 0);
   document.getElementById('cntAir').textContent = AQI.length;
   document.getElementById('cntAlerts').textContent = (D && D.alerts ? D.alerts.length : 0);
+  document.getElementById('cntEvac').textContent = (ev && ev.total) ? ev.total : (EVAC.length || 0);
 }
 
 /* ---------- tabs ---------- */
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tab') === name); });
-  ['fires','air','alerts','smoke'].forEach(function(t){
+  ['fires','air','alerts','evac','smoke'].forEach(function(t){
     document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
   });
   if(name === 'fires') buildFires();
   if(name === 'air') buildAir();
   if(name === 'alerts') buildAlerts();
+  if(name === 'evac') buildEvac();
   if(name === 'smoke') buildSmoke();
 }
 document.querySelectorAll('.tab').forEach(function(t){

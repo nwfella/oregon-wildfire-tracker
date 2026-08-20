@@ -293,6 +293,19 @@ def get_evac():
         st = (a.get("status") or "").strip()
         lv = evac_level(st)
         rings = rings_from_geom(f.get("geometry"))  # raw rings are EPSG:3857
+        # center point: WFS latitude/longitude are already EPSG:4326
+        try:
+            clat = round(float(a.get("latitude")), 5)
+            clon = round(float(a.get("longitude")), 5)
+        except (TypeError, ValueError):
+            clat = clon = None
+        if not rings:
+            continue
+        if clat is None or clon is None or not (-124.8 <= clon <= -116.3 and 41.9 <= clat <= 46.5):
+            # fall back to the centroid of the first ring (3857 → 4326)
+            r0 = rings[0]
+            clon, clat = webmerc_to_lonlat(
+                sum(p[0] for p in r0) / len(r0), sum(p[1] for p in r0) / len(r0))
         simp = []
         for r in rings:
             rr = [webmerc_to_lonlat(x, y) for x, y in r]
@@ -307,7 +320,7 @@ def get_evac():
         out.append({
             "id": a.get("id") or a.get("identifer") or None,
             "n": (a.get("evacuation_zone") or a.get("commonly_known_as") or "").strip() or "Evacuation zone",
-            "st": st, "lv": lv, "p": simp,
+            "st": st, "lv": lv, "p": simp, "lat": clat, "lon": clon, "cnty": None,
         })
     # cap total points to keep the baked HTML lean
     total = sum(len(r) for o in out for r in o["p"])
@@ -317,6 +330,33 @@ def get_evac():
             o["p"] = [r[::max(1, int(1 / factor))] + [r[-1]] for r in o["p"]]
     out.sort(key=lambda o: -o["lv"])
     return out
+
+
+def point_in_rings(lon, lat, rings):
+    """Ray-cast point-in-polygon (even-odd) over a list of rings."""
+    inside = False
+    for ring in rings:
+        n = len(ring)
+        j = n - 1
+        for i in range(n):
+            xi, yi = ring[i]
+            xj, yj = ring[j]
+            if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi):
+                inside = not inside
+            j = i
+    return inside
+
+
+def assign_evac_counties(evac, counties):
+    """Tag each evac zone with the county its center point falls in (from baked county polys)."""
+    for z in evac:
+        if z.get("lat") is None:
+            continue
+        for c in counties:
+            if point_in_rings(z["lon"], z["lat"], c["p"]):
+                z["cnty"] = c["n"]
+                break
+    return evac
 
 
 def build_static_evac_line(evac):
@@ -333,8 +373,16 @@ def build_static_evac_line(evac):
         parts.append(f"{st} be set")
     if rd:
         parts.append(f"{rd} be ready")
+    # top GO counties (no-JS users get location context without the map)
+    go_cnty = {}
+    for z in evac:
+        if z["lv"] >= 3 and z.get("cnty"):
+            go_cnty[z["cnty"]] = go_cnty.get(z["cnty"], 0) + 1
+    top = ", ".join(f"{c} ({n})" for c, n in sorted(go_cnty.items(), key=lambda kv: -kv[1])[:3])
+    loc = f" — most affected: {top}" if top else ""
     return ('<p style="margin:10px 0; color:#8b93a7;">⚠ Evacuation zones (Genasys Protect): '
             + ", ".join(parts)
+            + loc
             + '. <a href="https://protect.genasys.com/" style="color:#ff6b1a;">Verify with Genasys Protect</a>.</p>')
 
 
@@ -506,6 +554,8 @@ def main():
 
     counties = build_counties(incidents)
     print(f"  counties: {len(counties)}")
+
+    evac = assign_evac_counties(evac, counties)
 
     with open(os.path.join(ROOT, "assets", "oregon_outline.json"), encoding="utf-8") as f:
         outline = json.load(f)["rings"]
