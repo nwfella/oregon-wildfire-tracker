@@ -16,6 +16,7 @@ Sources:
 Usage:  python scripts/collect.py
 """
 import json
+import math
 import os
 import re
 import sys
@@ -46,6 +47,15 @@ AQI_URL = ("https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/"
            "&resultRecordCount=400")
 NWS_URL = "https://api.weather.gov/alerts/active?area=OR"
 SMOKE_URL = "https://oregonsmoke.blogspot.com/feeds/posts/default?alt=rss"
+
+# Genasys Protect (Zonehaven EVAC) — public GeoServer WFS of county evacuation zones.
+# The full layer is ~80 MB for the Oregon bbox, so we filter server-side with CQL to
+# non-Normal zones only (~1.5 MB). Geometry is EPSG:3857; we reproject to 4326.
+# Data courtesy of Genasys Protect / participating counties (footer attribution).
+EVAC_CQL = "BBOX(geom,-125,41.9,-116.3,46.5,'EPSG:4326') AND status <> 'Normal'"
+EVAC_URL = ("https://cdngeospatialcei.zonehaven.com/geoserver/zonehavenv2/wfs?service=WFS"
+            "&version=1.1.0&request=GetFeature&typeName=zonehavenv2:evacuation_zone"
+            "&outputFormat=application/json&CQL_FILTER=" + urllib.parse.quote(EVAC_CQL, safe=""))
 
 ALERT_EVENTS = {
     "Red Flag Warning": 1, "Fire Weather Watch": 2, "Evacuation": 3, "Evacuation Order": 3,
@@ -249,6 +259,85 @@ def get_aqi():
     return sorted(by_name.values(), key=lambda o: -o["v"])
 
 
+# ---------------------------------------------------------------- evac zones (Genasys Protect)
+EVAC_LEVEL_COLORS = {4: "#c9184a", 3: "#ff3b30", 2: "#ff8c1a", 1: "#ffd24d", 0: "#8b93a7"}
+
+
+def evac_level(status):
+    """Map a Genasys status string to a numeric level (4=order, 3=GO, 2=SET, 1=READY, 0=other)."""
+    s = (status or "").lower()
+    if "level 3" in s or "go now" in s:
+        return 3
+    if "order" in s:
+        return 4
+    if "level 2" in s or "be set" in s:
+        return 2
+    if "level 1" in s or "be ready" in s:
+        return 1
+    return 0
+
+
+def webmerc_to_lonlat(x, y):
+    """EPSG:3857 (meters) -> EPSG:4326 (degrees)."""
+    lon = x / (math.pi * 6378137.0) * 180.0
+    lat = math.degrees(2.0 * math.atan(math.exp(y / 6378137.0)) - math.pi / 2.0)
+    return (round(lon, 6), round(lat, 6))
+
+
+def get_evac():
+    """Fetch active (non-Normal) Genasys evacuation zones for Oregon, as simplified 4326 rings."""
+    g = fetch_json(EVAC_URL)
+    out = []
+    for f in g.get("features", []):
+        a = f.get("properties") or {}
+        st = (a.get("status") or "").strip()
+        lv = evac_level(st)
+        rings = rings_from_geom(f.get("geometry"))  # raw rings are EPSG:3857
+        simp = []
+        for r in rings:
+            rr = [webmerc_to_lonlat(x, y) for x, y in r]
+            s = dp_simplify(rr, 0.002)
+            if len(s) >= 4:
+                if len(s) > 800:  # cap per-ring points
+                    step = len(s) // 800
+                    s = s[::step] + [s[-1]]
+                simp.append(s)
+        if not simp:
+            continue
+        out.append({
+            "id": a.get("id") or a.get("identifer") or None,
+            "n": (a.get("evacuation_zone") or a.get("commonly_known_as") or "").strip() or "Evacuation zone",
+            "st": st, "lv": lv, "p": simp,
+        })
+    # cap total points to keep the baked HTML lean
+    total = sum(len(r) for o in out for r in o["p"])
+    if total > 25000:
+        factor = 25000 / total
+        for o in out:
+            o["p"] = [r[::max(1, int(1 / factor))] + [r[-1]] for r in o["p"]]
+    out.sort(key=lambda o: -o["lv"])
+    return out
+
+
+def build_static_evac_line(evac):
+    """No-JS fallback line for the noscript block."""
+    if not evac:
+        return '<p style="margin:10px 0; color:#5c6478;">No active evacuation zones reported.</p>'
+    go = sum(1 for z in evac if z["lv"] >= 3)
+    st = sum(1 for z in evac if z["lv"] == 2)
+    rd = sum(1 for z in evac if z["lv"] == 1)
+    parts = []
+    if go:
+        parts.append(f'<b style="color:#ff3b30;">{go} zone{"s" if go != 1 else ""} at GO NOW / order</b>')
+    if st:
+        parts.append(f"{st} be set")
+    if rd:
+        parts.append(f"{rd} be ready")
+    return ('<p style="margin:10px 0; color:#8b93a7;">⚠ Evacuation zones (Genasys Protect): '
+            + ", ".join(parts)
+            + '. <a href="https://protect.genasys.com/" style="color:#ff6b1a;">Verify with Genasys Protect</a>.</p>')
+
+
 # ---------------------------------------------------------------- alerts
 def get_alerts():
     d = fetch_json(NWS_URL)
@@ -402,6 +491,19 @@ def main():
         warnings.append(f"smoke: {e}")
         smoke = []
 
+    try:
+        evac = get_evac()
+        evac_go = sum(1 for z in evac if z["lv"] == 3)
+        evac_order = sum(1 for z in evac if z["lv"] == 4)
+        evac_set = sum(1 for z in evac if z["lv"] == 2)
+        evac_ready = sum(1 for z in evac if z["lv"] == 1)
+        print(f"  evac zones: {len(evac)} active "
+              f"({evac_order + evac_go} go/order, {evac_set} set, {evac_ready} ready)")
+    except Exception as e:
+        warnings.append(f"evac: {e}")
+        evac = []
+        evac_go = evac_order = evac_set = evac_ready = 0
+
     counties = build_counties(incidents)
     print(f"  counties: {len(counties)}")
 
@@ -422,6 +524,7 @@ def main():
         "fires": len(incidents), "acres": round(total_acres), "avgCont": avg_cont,
         "per": total_per, "new24": new24, "redFlags": red_flags,
         "worstAqi": {"city": worst["c"], "aqi": worst["aqi"], "cat": worst["cat"]} if worst else None,
+        "evac": {"go": evac_go, "order": evac_order, "set": evac_set, "ready": evac_ready, "total": len(evac)},
     }
 
     data = {
@@ -429,6 +532,7 @@ def main():
         "stats": stats,
         "incidents": incidents,
         "perimeters": perimeters,
+        "evac": evac,
         "aqi": aqi,
         "alerts": [{"e": a["e"], "h": a["h"], "a": a["a"], "sev": a["sev"],
                     "on": a["on"], "ex": a["ex"], "d": a["d"], "url": a["url"]} for a in alerts],
@@ -459,6 +563,12 @@ def main():
     mi = baked.find(m)
     if mi != -1:
         baked = baked[:mi] + static_rows + baked[mi + len(m):]
+
+    evac_line = build_static_evac_line(evac).encode("utf-8")
+    m2 = b"<!--__STATIC_EVAC__-->"
+    mi2 = baked.find(m2)
+    if mi2 != -1:
+        baked = baked[:mi2] + evac_line + baked[mi2 + len(m2):]
 
     out_path = os.path.join(ROOT, "index.html")
     with open(out_path, "wb") as f:

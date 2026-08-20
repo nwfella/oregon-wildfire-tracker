@@ -21,7 +21,7 @@ SNAP = os.path.join(ROOT, "data", "snapshot.json")
 PREV = os.path.join(ROOT, "data", "snapshot_prev.json")
 DRY = "--dry-run" in sys.argv
 
-MATERIAL = ["incidents", "perimeters", "aqi", "alerts", "smoke", "counties", "cities", "stats"]
+MATERIAL = ["incidents", "perimeters", "evac", "aqi", "alerts", "smoke", "counties", "cities", "stats"]
 
 
 def run(cmd, **kw):

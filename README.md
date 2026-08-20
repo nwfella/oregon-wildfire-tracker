@@ -18,6 +18,9 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
   personnel, structures lost, complexity, discovery & last-report times
 - **Anchored popup details** — tap a fire on the map and a popup bubble appears right next to the marker (arrow pointing at it, flips below near the top edge, follows while panning/zooming); select a fire or AQI monitor from the lists below and the same detail card appears inline at the top of the rail — full details visible from either surface, no scrolling required
 - **Daily perimeters** — orange fire boundaries, pulse-highlighted when a fire is selected
+- **Evacuation zones** — Genasys Protect GO/SET/READY/order polygons overlaid on the map
+  (pulse-highlighted at GO/order), level counts in the legend, and a warning banner when
+  any zone is at GO NOW / evacuation order
 - **Air quality** — PM2.5 readings from 100+ Oregon monitors (OpenAQ mirror), EPA AQI +
   category colors, worst-first ranking
 - **NWS alerts** — red flag warnings, fire weather watches, evacuations, air quality alerts,
@@ -32,17 +35,25 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 |---|---|
 | Incidents | Esri Live Feeds `USA_Wildfires_v1` (NIFC/WFIGS mirror) |
 | Perimeters | Esri `Wildfire_aggregated_v1` (daily fire perimeters) |
+| Evacuation zones | Genasys Protect (Zonehaven EVAC) public GeoServer WFS, non-Normal zones only |
 | Air quality | Esri OpenAQ mirror (PM2.5 latest readings) |
 | Alerts | NWS `api.weather.gov` (area=OR) |
 | Smoke | Oregon Smoke Information Blog (RSS) |
 | Counties | BLM OR County Boundaries (Oregon statewide framework) |
 
+## Data attribution
+
+Evacuation zone data is courtesy of **Genasys Protect** (protect.genasys.com) and the
+participating Oregon counties that publish through it. The tracker queries Genasys's public
+WFS server-side (no API keys) and bakes the snapshot; it is not an official Genasys product.
+Zone statuses change quickly — **always verify with local officials** before acting on them.
+
 ## How it works
 
 ```
 scripts/collect.py (cron, every 30 min)
-  ├─ fetch incidents / perimeters / AQI / alerts / smoke (parallel, keyless)
-  ├─ normalize + simplify geometry (Douglas-Peucker: 11 MB counties → 117 KB)
+  ├─ fetch incidents / perimeters / evac zones / AQI / alerts / smoke (parallel, keyless)
+  ├─ normalize + simplify geometry (Douglas-Peucker: 11 MB counties → 117 KB; evac zones filtered to non-Normal via CQL, reprojected 3857→4326)
   ├─ compute stats + county burn heat + EPA AQI
   └─ bake inline JSON into index.html via template.html markers
         → git commit + push → GitHub Pages serves the static snapshot
@@ -62,7 +73,8 @@ python scripts/collect.py    # fetches + bakes index.html
 
 ## Stats snapshot (Aug 2026 fire season)
 
-97 active fires, ~2.26M acres burning, 6 red-flag warnings, worst AQI 394 (Hazardous).
+97 active fires, ~2.26M acres burning, 6 red-flag warnings, worst AQI 394 (Hazardous),
+229 active evacuation zones (81 GO NOW / order, 69 set, 78 ready).
 
 ## License
 

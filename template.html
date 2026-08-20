@@ -65,6 +65,17 @@
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
   .dot.stale{background:var(--yellow);box-shadow:0 0 8px var(--yellow);}
   .dot.err{background:var(--red);box-shadow:0 0 8px var(--red);}
+  #evacBanner{
+    display:none; align-items:center; gap:12px; flex-wrap:wrap;
+    margin:12px 20px 0; padding:10px 14px; max-width:1400px;
+    background:linear-gradient(180deg, rgba(255,59,48,.13), rgba(201,24,74,.08));
+    border:1px solid rgba(255,59,48,.45); border-radius:12px;
+    font-size:13px; color:var(--text);
+  }
+  #evacBanner b{color:#ff6b1a; letter-spacing:.4px;}
+  #evacBanner .evac-sub{color:var(--muted); font-size:12px;}
+  #evacBanner a{margin-left:auto; color:var(--accent2); text-decoration:none; font-weight:700; font-size:12px; letter-spacing:.5px; white-space:nowrap;}
+  #evacBanner a:hover{text-decoration:underline;}
   #stats{
     display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px;
     padding:14px 20px 0; width:100%; max-width:1400px; margin:0 auto;
@@ -402,11 +413,12 @@
     </div>
     <span class="pill"><span id="liveDot" class="dot"></span><span id="liveLabel">snapshot</span></span>
     <span class="pill">Updated <b id="updatedText">—</b></span>
-    <span class="pill">Data via <b>NIFC/WFIGS · NWS · OpenAQ</b></span>
+    <span class="pill">Data via <b>NIFC/WFIGS · NWS · OpenAQ · Genasys</b></span>
   </div>
 </header>
 
 <section id="alertBar"></section>
+<div id="evacBanner"></div>
 
 <main>
   <div id="mapWrap">
@@ -445,12 +457,13 @@
   </aside>
 
 <footer>
-  <span>🏔 Oregon Wildfire Tracker — a fully static snapshot. No live network calls; refresh happens server-side.</span>
+  <span>🏔 Oregon Wildfire Tracker — a fully static snapshot. No live network calls; refresh happens server-side. Evacuation zones courtesy of <a href="https://protect.genasys.com/" target="_blank" rel="noopener" style="color:#ff8c1a;">Genasys Protect</a> — always verify with local officials.</span>
   <span class="src">
     <a href="https://www.nifc.gov/fire-information" target="_blank" rel="noopener">NIFC/WFIGS</a>
     <a href="https://api.weather.gov" target="_blank" rel="noopener">NWS API</a>
     <a href="https://openaq.org" target="_blank" rel="noopener">OpenAQ</a>
     <a href="https://oregonsmoke.blogspot.com/" target="_blank" rel="noopener">OR Smoke Blog</a>
+    <a href="https://protect.genasys.com/" target="_blank" rel="noopener" title="Evacuation zone data courtesy of Genasys Protect">Genasys Protect</a>
   </span>
 </footer>
 
@@ -462,7 +475,8 @@
       <tr style="text-align:left; color:#ff6b1a;"><th style="padding:6px; border:1px solid #242a38;">Fire</th><th style="padding:6px; border:1px solid #242a38;">County</th><th style="padding:6px; border:1px solid #242a38;">Acres</th><th style="padding:6px; border:1px solid #242a38;">Contained</th><th style="padding:6px; border:1px solid #242a38;">Cause</th></tr>
       <!--__STATIC_FIRES__-->
     </table>
-    <p style="margin:10px 0; color:#5c6478;">Updated: <span id="noscriptUpdated">—</span>. Source: NIFC/WFIGS, NWS, OpenAQ.</p>
+    <!--__STATIC_EVAC__-->
+    <p style="margin:10px 0; color:#5c6478;">Updated: <span id="noscriptUpdated">—</span>. Source: NIFC/WFIGS, NWS, OpenAQ, Genasys Protect.</p>
   </div>
 </noscript>
 
@@ -511,6 +525,9 @@ function contColor(c){
 }
 function contLabel(c){ return c == null ? 'n/a' : c + '%'; }
 
+/* evacuation level colors (4=order, 3=GO, 2=SET, 1=READY, 0=other) — safety colors, fixed across themes */
+var EVAC_COLORS = { 4:'#c9184a', 3:'#ff3b30', 2:'#ff8c1a', 1:'#ffd24d', 0:'#8b93a7' };
+
 /* ---------- projection ---------- */
 var LON0 = -124.8, LAT1 = 46.5, K = 111320, COSL = Math.cos(44.5*Math.PI/180);
 function proj(lon, lat){
@@ -525,7 +542,7 @@ var drag = null, pinch = null;
 var dirty = true;
 
 /* ---------- layer filters (legend toggles) ---------- */
-var LAYERS = { fires: true, perims: true, heat: true, aqi: true,
+var LAYERS = { fires: true, perims: true, heat: true, aqi: true, evac: true,
   cont: { lt25: true, b2550: true, b5090: true, gte90: true } };
 try{
   var lj = JSON.parse(localStorage.getItem('or-layers') || 'null');
@@ -543,18 +560,19 @@ function contBucket(c){
   return 'gte90';
 }
 function anyLayerOff(){
-  if(!LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi) return true;
+  if(!LAYERS.fires || !LAYERS.perims || !LAYERS.heat || !LAYERS.aqi || !LAYERS.evac) return true;
   for(var cb in LAYERS.cont){ if(!LAYERS.cont[cb]) return true; }
   return false;
 }
 
 /* ---------- build lookup ---------- */
-var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [];
+var INC = [], INC_BY_NAME = {}, AQI = [], PERIM = [], CNTY = [], CITIES = [], EVAC = [];
 if(D){
   INC = D.incidents || [];
   INC.forEach(function(inc){ INC_BY_NAME[(inc.n||'').toLowerCase()] = inc; });
   AQI = D.aqi || [];
   PERIM = D.perimeters || [];
+  EVAC = D.evac || [];
   CNTY = D.counties || [];
   CITIES = D.cities || [];
 }
@@ -716,6 +734,35 @@ function drawStateOutline(){
   ctx.strokeStyle = MAPT.outlineBorder;
   ctx.lineWidth = 2;
   ctx.stroke();
+}
+function drawEvacZones(){
+  if(!LAYERS.evac) return;
+  var now = Date.now();
+  EVAC.forEach(function(z){
+    ctx.beginPath();
+    z.p.forEach(function(ring, ri){
+      var first = true;
+      ring.forEach(function(pt){
+        var s = toScreen(pt[0], pt[1]);
+        if(first){ ctx.moveTo(s[0], s[1]); first = false; }
+        else ctx.lineTo(s[0], s[1]);
+      });
+      ctx.closePath();
+    });
+    var col = EVAC_COLORS[z.lv] || EVAC_COLORS[0];
+    ctx.fillStyle = col + '2e';
+    ctx.fill();
+    ctx.strokeStyle = col + 'd9';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    if(z.lv >= 3){
+      // pulse GO/order zones to draw the eye
+      var ph = (now/450) % (Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,59,48,' + (0.22 + 0.22*Math.sin(ph)) + ')';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+  });
 }
 function drawPerimeters(){
   if(!LAYERS.perims) return;
@@ -900,6 +947,7 @@ function render(){
     return;
   }
   drawCounties();
+  drawEvacZones();
   drawPerimeters();
   drawIncidents();
   drawAQI();
@@ -1324,6 +1372,20 @@ function buildAlertBar(){
   }).join('');
 }
 
+/* ---------- evac banner ---------- */
+function buildEvacBanner(){
+  var el = document.getElementById('evacBanner');
+  if(!el) return;
+  var e = (D && D.stats && D.stats.evac) || null;
+  var n = e ? ((e.order || 0) + (e.go || 0)) : 0;
+  if(!e || !n){ el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML =
+    '<span>⚠️ <b>' + n + ' evacuation zone' + (n === 1 ? '' : 's') + ' at GO NOW / order</b>' +
+    '<span class="evac-sub">' + (e.set || 0) + ' be set · ' + (e.ready || 0) + ' be ready</span>' +
+    '<a href="https://protect.genasys.com/" target="_blank" rel="noopener">Verify on Genasys Protect →</a>';
+}
+
 /* ---------- stats ---------- */
 function buildStats(){
   var el = document.getElementById('stats');
@@ -1404,6 +1466,12 @@ function updateLegendUI(){
     pill.style.display = 'none';
   }
 }
+function evacKey(lv, label){
+  var n = 0;
+  EVAC.forEach(function(z){ if(z.lv === lv) n++; });
+  return '<div class="lg-row lg-chip" title="' + label + '"><span class="kdot" style="background:' + (EVAC_COLORS[lv] || EVAC_COLORS[0]) + ';"></span>' + label +
+    (n ? ' <span style="color:var(--text);">' + n + '</span>' : '') + '</div>';
+}
 function buildLegend(){
   var el = document.getElementById('legend');
   var anyOff = anyLayerOff();
@@ -1422,6 +1490,11 @@ function buildLegend(){
     '<span class="lg-cap">containment</span></div>' +
     '<div class="lg-row' + (LAYERS.perims ? '' : ' off') + '" data-layer="perims" title="Toggle fire perimeters">' +
     '<i style="background:' + MAPT.perimStroke + ';"></i><span class="lbl">Fire perimeters</span></div>' +
+    '<div class="lg-row' + (LAYERS.evac ? '' : ' off') + '" data-layer="evac" title="Toggle evacuation zones (Genasys Protect)">' +
+    '<i style="background:' + EVAC_COLORS[3] + ';"></i><span class="lbl">Evacuation zones</span></div>' +
+    '<div class="lg-keys' + (LAYERS.evac ? '' : ' off') + '">' +
+    evacKey(4,'ORDER') + evacKey(3,'GO NOW') + evacKey(2,'BE SET') + evacKey(1,'READY') +
+    '<span class="lg-cap">evacuation level · Genasys Protect</span></div>' +
     '<div class="lg-row' + (LAYERS.heat ? '' : ' off') + '" data-layer="heat" title="Toggle county burn heat">' +
     '<span class="sw" style="background:linear-gradient(90deg,' + MAPT.burnA + ',' + MAPT.burnB + ');"></span>' +
     '<span class="lbl">County burn heat</span></div>' +
@@ -1466,6 +1539,7 @@ function boot(){
   else { document.getElementById('liveDot').className = 'dot'; document.getElementById('liveLabel').textContent = 'live snapshot'; }
   buildLegend();
   buildStats();
+  buildEvacBanner();
   buildAlertBar();
   buildFires();
   buildAir();
