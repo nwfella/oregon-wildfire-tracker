@@ -12,6 +12,7 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
 - **5 color themes** — Ember (default), Forest, Ocean, Magma, Daybreak; theme picker in the header, saved to localStorage, the canvas map recolorizes to match
 - **Legend = layer filters** — tap any legend row (active fires, perimeters, county burn heat, AQI monitors) to hide/show that layer on the map; multi-select; "show all" reset; choices remembered
 - **Collapsible legend** — the **−** button minimizes it to a small "Legend" pill (tap to bring it back; auto-collapsed on phones, where it used to be hidden entirely)
+- **Dismissable alerts** — collapse the whole alert strip to a "🚩 N alerts" pill (auto-collapsed on phones for extra map room), or ✕ away individual alerts you don't care about; both choices remembered in localStorage
 - **Mobile-first** — 60vh touch map, pinch-zoom + drag pan, 40px tap targets, swipeable alert strip, responsive grid lists; everything below the fold stacks cleanly
 - **County burn-heat choropleth** — counties shaded by active fire acreage
 - **Active fires** — 97 incidents live from the NIFC/WFIGS feed: size, containment, cause,
