@@ -92,17 +92,21 @@
   #alertBar{
     padding:12px 20px 0; display:flex; flex-direction:row; gap:8px; overflow-x:auto;
     width:100%; max-width:1400px; margin:0 auto; scrollbar-width:none;
+    overscroll-behavior-x:contain; scroll-snap-type:x proximity;
   }
   #alertBar::-webkit-scrollbar{display:none;}
   .alert-chip{
     display:flex; align-items:center; gap:10px; border-radius:10px; padding:8px 14px; cursor:pointer;
-    border:1px solid; font-size:13px; transition:filter .15s; flex:none; max-width:420px;
+    border:1px solid; font-size:13px; flex:none; min-width:0; max-width:420px;
+    overflow:hidden; -webkit-tap-highlight-color:transparent; scroll-snap-align:start;
   }
-  .alert-chip:hover{filter:brightness(1.15);}
+  @media (hover:hover){
+    .alert-chip:hover{box-shadow:0 0 0 2px rgba(255,255,255,.28);}
+  }
   .alert-chip .a-icon{font-size:15px; flex:none;}
   .alert-chip .a-head{font-weight:700; flex:none;}
-  .alert-chip .a-headline{color:var(--chip-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
-  .alert-chip .a-area{color:var(--chip-area); flex:none; font-size:12px;}
+  .alert-chip .a-headline{color:var(--chip-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;}
+  .alert-chip .a-area{color:var(--chip-area); flex:none; font-size:12px; white-space:nowrap;}
   main{
     display:block; padding:14px 20px 0; width:100%;
     max-width:1400px; margin:0 auto;
@@ -309,6 +313,8 @@
     #mapControls button{width:40px; height:40px; font-size:17px;}
     #mapHint{display:none;}
     header{padding:10px 14px;}
+    #alertBar{padding:10px 12px 0;}
+    .alert-chip{max-width:calc(100vw - 24px);}
   }
   @media (max-width:560px){
     #stats{grid-template-columns:repeat(2,1fr);}
