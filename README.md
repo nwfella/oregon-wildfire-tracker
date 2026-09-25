@@ -29,7 +29,7 @@ into `index.html` server-side, so the page works even where corporate IT blocks 
   heat warnings (color-coded swipe strip + list)
 - **Oregon Smoke Blog** — latest smoke outlook posts
 - **No-JS fallback** — static table of the top fires renders with JavaScript disabled
-- **Zero runtime network calls** — a cron refreshes the snapshot every 30 minutes
+- **Zero runtime network calls** — a cron refreshes the snapshot once a day (08:00 PT)
 
 ## Data sources (all public, no API keys)
 
@@ -53,7 +53,7 @@ Zone statuses change quickly — **always verify with local officials** before a
 ## How it works
 
 ```
-scripts/collect.py (cron, every 30 min)
+scripts/collect.py (via scripts/publish.py, cron daily 08:00 PT)
   ├─ fetch incidents / perimeters / evac zones / AQI / alerts / smoke (parallel, keyless)
   ├─ normalize + simplify geometry (Douglas-Peucker: 11 MB counties → 117 KB; evac zones filtered to non-Normal via CQL, reprojected 3857→4326)
   ├─ compute stats + county burn heat + EPA AQI
