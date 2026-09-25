@@ -73,6 +73,23 @@ scripts/collect.py (via scripts/publish.py, cron daily 08:00 PT)
 python scripts/collect.py    # fetches + bakes index.html
 ```
 
+## Refresh cadence
+
+**Once a day at 08:00 PT.** One Hermes cron job runs `scripts/publish.py` (via
+`oregon-fire-publish.py`, job `6369ea550765`); it bakes the snapshot, commits + pushes only when
+the material data changed, and stays silent otherwise. The job is script-only (`no_agent`), so it
+consumes no AI tokens.
+
+> **Changed 2026-09-25:** this used to run **3×/day** (`0 0,8,16 * * *` — every 8 hours). Git
+> history showed the bake produced a material change 2–3×/day, so the third run was usually a
+> no-op. It is now a single daily 08:00 PT run.
+>
+> **Freshness caveat:** with a 24-hour cycle, *every* baked layer can be up to a day old —
+> including the time-sensitive ones, the Genasys evacuation zones and the NWS red-flag warnings.
+> Those upstream sources update far faster than the bake. Treat the page as a snapshot, not a
+> live feed, and **verify evac status with local officials** before acting on it. Cadence is a
+> one-line cron change if a faster cycle is ever needed during a peak (e.g. 08:00 + 20:00).
+
 ## Stats snapshot (Aug 2026 fire season)
 
 97 active fires, ~2.26M acres burning, 6 red-flag warnings, worst AQI 394 (Hazardous),
